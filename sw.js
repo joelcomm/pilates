@@ -1,5 +1,5 @@
 /* Offline cache for Mat Daily. Bump VERSION when files change. */
-var VERSION = 'matdaily-v4';
+var VERSION = 'matdaily-v5';
 var FILES = ['./', 'index.html', 'style.css', 'exercises.js', 'app.js', 'manifest.webmanifest',
   'fonts/fonts.css', 'fonts/bricolage-600.woff2', 'fonts/bricolage-800.woff2',
   'fonts/instrument-400.woff2', 'fonts/instrument-500.woff2', 'fonts/instrument-600.woff2',

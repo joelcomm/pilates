@@ -478,14 +478,26 @@
   }
 
   // Spoken prompts.
+  // On an iPad, use the downloaded "Zoe" voice (Enhanced or Premium). Everywhere else, use the usual pick.
+  function isIpad() {
+    var ua = navigator.userAgent || '';
+    return /iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
   function pickVoice() {
     try {
       var vs = speechSynthesis.getVoices().filter(function (v) { return /^en/i.test(v.lang); });
+      if (isIpad()) {
+        var zoe = vs.filter(function (v) { return /zoe/i.test(v.name); });
+        var best = zoe.filter(function (v) { return /premium|enhanced/i.test(v.name); })[0] || zoe[0];
+        if (best) return best;
+      }
       var pref = ['Samantha', 'Ava', 'Allison', 'Karen', 'Serena', 'Moira', 'Daniel'];
       for (var i = 0; i < pref.length; i++) { var f = vs.filter(function (v) { return v.name.indexOf(pref[i]) >= 0; })[0]; if (f) return f; }
       return vs[0] || null;
     } catch (e) { return null; }
   }
+  try { if ('speechSynthesis' in window) speechSynthesis.getVoices(); } catch (e) { /* voices load lazily */ }
+
   function say(text) {
     if (!prefs().voice || !('speechSynthesis' in window)) return;
     try {
