@@ -39,7 +39,8 @@
       hip: p.h, s1: s1, s2: s2,
       head: pt(s2, p.hd === undefined ? t2 : p.hd, NK),
       arms: p.a.map(function (s) { return limb(s2, s, UA, FA, 1); }),
-      legs: p.l.map(function (s) { return limb(p.h, s, TH, SH, -1); })
+      legs: p.l.map(function (s) { return limb(p.h, s, TH, SH, -1); }),
+      ring: p.ring
     };
   }
 
@@ -55,6 +56,19 @@
     return '<line class="wt" x1="' + f1(h[0] - dx) + '" y1="' + f1(h[1] - dy) + '" x2="' + f1(h[0] + dx) + '" y2="' + f1(h[1] + dy) + '"/>';
   }
 
+  function ringCenter(sk) {
+    var r = sk.ring, a, b;
+    if (r.at === 'knees') { a = sk.legs[0][1]; b = sk.legs[1][1]; }
+    else if (r.at === 'ankles') { a = sk.legs[0][2]; b = sk.legs[1][2]; }
+    else { a = sk.arms[0][2]; b = sk.arms[1][2]; }
+    return [(a[0] + b[0]) / 2 + (r.dx || 0), (a[1] + b[1]) / 2 + (r.dy || 0)];
+  }
+
+  function ringShape(sk) {
+    var c = ringCenter(sk);
+    return '<ellipse class="ring" cx="' + f1(c[0]) + '" cy="' + f1(c[1]) + '" rx="' + sk.ring.rx + '" ry="' + sk.ring.ry + '"/>';
+  }
+
   function shapes(sk, withWeights) {
     var out = '';
     out += poly(sk.arms[1], 'far') + poly(sk.legs[1], 'far');
@@ -63,12 +77,14 @@
     out += poly(sk.arms[0], 'body');
     out += '<circle class="head" cx="' + f1(sk.head[0]) + '" cy="' + f1(sk.head[1]) + '" r="' + HR + '"/>';
     if (withWeights) out += weightsAt(sk.arms[1]) + weightsAt(sk.arms[0]);
+    if (sk.ring) out += ringShape(sk);
     return out;
   }
 
   function allPoints(sk) {
     var pts = [sk.hip, sk.s1, sk.s2, sk.head];
     sk.arms.concat(sk.legs).forEach(function (l) { pts = pts.concat(l); });
+    if (sk.ring) { var rc = ringCenter(sk); pts.push([rc[0] - sk.ring.rx, rc[1] - sk.ring.ry], [rc[0] + sk.ring.rx, rc[1] + sk.ring.ry]); }
     return pts;
   }
 
@@ -485,6 +501,95 @@
       feel: 'Glutes, hamstrings',
       frames: [{ h: [120, 55], t: -90, a: [[0, 0], [2, 2]], l: [{ to: [120, 110], b: -1 }, { to: [120, 110], b: -1 }] },
         { h: [120, 55], t: -75, a: [[0, 0], [2, 2]], l: [[150, 150], { to: [120, 110], b: -1 }] }]
+    },
+
+    // ===== PILATES RING (magic circle) =====
+    {
+      id: 'ringsqueeze', name: 'Ring Knee Squeeze', g: ['legs', 'abs'], pos: 'supine', lvl: 1, kind: 'reps', tempo: 3, ring: true, use: ['main'],
+      blurb: 'Squeeze the ring between your knees to light up the inner thighs and deep abs.',
+      steps: ['Lie on your back, knees bent, feet flat. Place the ring between your knees.',
+        'Exhale and squeeze the ring firmly, drawing your lower belly in.',
+        'Inhale and ease off without letting the ring drop.',
+        'Keep your hips level and your low back long.'],
+      cues: ['Squeeze from the inner thighs', 'Ribs stay down', 'Slow and steady'],
+      easier: 'Squeeze lightly and hold for 3 counts.', harder: 'Pulse the squeeze quickly for the last 10.',
+      feel: 'Inner thighs, deep abs',
+      frames: [P(SUPK, { ring: { at: 'knees', rx: 6, ry: 11 } }), P(SUPK, { ring: { at: 'knees', rx: 2.5, ry: 11 } })]
+    },
+    {
+      id: 'ringbridge', name: 'Ring Bridge', g: ['legs'], pos: 'supine', lvl: 2, kind: 'reps', tempo: 4, ring: true, use: ['main'],
+      blurb: 'A glute bridge with the ring between your knees. Squeeze as you lift for extra inner thigh and glute work.',
+      steps: ['Lie on your back with the ring between your knees, feet flat.',
+        'Squeeze the ring, then peel your spine up into a bridge.',
+        'Hold the squeeze at the top and keep your hips level.',
+        'Roll down slowly, one vertebra at a time.'],
+      cues: ['Keep squeezing the whole time', 'Press through your heels', 'Do not let the knees fall out'],
+      easier: 'Lift only part way up.', harder: 'Pulse the hips up and down 10 times at the top.',
+      feel: 'Glutes, inner thighs',
+      frames: [P(BR_DN, { ring: { at: 'knees', rx: 5, ry: 11 } }), P(BR_UP, { ring: { at: 'knees', rx: 3, ry: 11 } })]
+    },
+    {
+      id: 'ringchest', name: 'Ring Chest Squeeze', g: ['arms'], pos: 'standing', lvl: 1, kind: 'reps', tempo: 3, ring: true, use: ['main'],
+      blurb: 'Press your palms into the sides of the ring at chest height. A simple, burning move for the chest and arms.',
+      steps: ['Stand tall and hold the ring between your palms at chest height, elbows wide.',
+        'Exhale and squeeze the ring in, as if you could flatten it.',
+        'Inhale and ease off a little, without letting go.',
+        'Keep your shoulders down and your ribs knit together.'],
+      cues: ['Press the palms evenly', 'Elbows lifted', 'Breathe out as you squeeze'],
+      easier: 'Squeeze lightly and hold for 3 counts.', harder: 'Hold the squeeze and pulse 10 times.',
+      feel: 'Chest, arms',
+      frames: [P(STAND, { a: [{ rel: [24, 8], b: 1 }, { rel: [24, 8], b: 1 }], ring: { at: 'hands', rx: 8, ry: 9 } }), P(STAND, { a: [{ rel: [24, 8], b: 1 }, { rel: [24, 8], b: 1 }], ring: { at: 'hands', rx: 3, ry: 10 } })]
+    },
+    {
+      id: 'ringohp', name: 'Ring Overhead Press', g: ['arms'], pos: 'standing', lvl: 1, kind: 'reps', tempo: 4, ring: true, use: ['main'],
+      blurb: 'Hold the ring above your head and squeeze as you press up. It works the shoulders, upper arms and the sides of your waist.',
+      steps: ['Stand tall and hold the ring in front of your chest.',
+        'Exhale and press it overhead while squeezing in.',
+        'Inhale and lower it back down, still squeezing lightly.',
+        'Keep your ribs down so you do not arch.'],
+      cues: ['Squeeze all the way up', 'Shoulders away from ears', 'Tall spine'],
+      easier: 'Press only to the top of your head.', harder: 'Hold at the top for 3 breaths.',
+      feel: 'Shoulders, triceps',
+      frames: [P(STAND, { a: [{ to: [128, 2], b: 1 }, { to: [128, 2], b: 1 }], ring: { at: 'hands', rx: 8, ry: 9 } }), P(STAND, { a: [[-90, -90], [-88, -88]], ring: { at: 'hands', rx: 3, ry: 10, dy: -8 } })]
+    },
+    {
+      id: 'ringhundred', name: 'Ring Hundred', g: ['abs'], pos: 'supine', lvl: 2, kind: 'hold', tempo: 1, ring: true, use: ['main'],
+      blurb: 'The Hundred with the ring between your ankles. Squeezing it keeps your legs working while your abs hold you up.',
+      steps: ['Lie on your back with the ring between your ankles and your legs at about 45°.',
+        'Lift your head and shoulders and reach your arms long.',
+        'Squeeze the ring and pump your arms in small beats.',
+        'Inhale for 5 beats, exhale for 5.'],
+      cues: ['Squeeze the ring the whole time', 'Low back stays heavy', 'Pump from the shoulder'],
+      easier: 'Bend your knees into tabletop and put the ring between your knees.', harder: 'Lower your legs a little closer to the floor.',
+      feel: 'Abs, inner thighs',
+      frames: [P(SUP, { h: [145, 106], t: 180, t2: 205, hd: 208, a: [[8, 8], [8, 8]], l: [[-45, -45], [-42, -42]], ring: { at: 'ankles', rx: 3, ry: 8 } }),
+        P(SUP, { h: [145, 106], t: 180, t2: 205, hd: 208, a: [[-6, -6], [-6, -6]], l: [[-45, -45], [-42, -42]], ring: { at: 'ankles', rx: 3, ry: 8 } })]
+    },
+    {
+      id: 'ringlowers', name: 'Ring Leg Lowers', g: ['abs', 'legs'], pos: 'supine', lvl: 2, kind: 'reps', tempo: 4, ring: true, use: ['main'],
+      blurb: 'Lower and lift your legs with the ring between your ankles. It adds inner thigh work to the lower abs.',
+      steps: ['Lie on your back, legs straight up, ring between your ankles.',
+        'Exhale and lower your legs as far as you can with your low back flat.',
+        'Squeeze the ring the whole way.',
+        'Exhale and lift your legs back up.'],
+      cues: ['Squeeze, do not grip with the feet', 'Tailbone heavy', 'Slow lower'],
+      easier: 'Only lower halfway.', harder: 'Hold the bottom for 3 counts.',
+      feel: 'Lower abs, inner thighs',
+      frames: [P(SUP, P(CURL, { h: [145, 106], a: [[8, 8], [8, 8]], l: [[-90, -90], [-92, -92]], ring: { at: 'ankles', rx: 3, ry: 8 } })),
+        P(SUP, P(CURL, { h: [145, 106], a: [[8, 8], [8, 8]], l: [[-25, -25], [-22, -22]], ring: { at: 'ankles', rx: 3, ry: 8 } }))]
+    },
+    {
+      id: 'ringside', name: 'Ring Side-Lying Lift', g: ['legs'], pos: 'side', lvl: 1, kind: 'reps', tempo: 3, sides: true, ring: true, use: ['main'],
+      blurb: 'Hold the ring between your ankles in a side-lying lift. The squeeze adds inner thigh work to the outer hip lift.',
+      steps: ['Lie on your side with your body in one line and the ring between your ankles.',
+        'Squeeze the ring lightly and keep your hips stacked.',
+        'Exhale and lift both legs a few inches, then lower with control.',
+        'Do all reps, then switch sides.'],
+      cues: ['Hips stacked', 'Lift from the waist', 'Do not roll back'],
+      easier: 'Lift only the top leg and skip the ring.', harder: 'Add 10 small pulses at the top.',
+      feel: 'Outer hip, inner thigh, waist',
+      frames: [{ h: [150, 105], t: 180, hd: 180, a: [{ to: [142, 98], b: -1 }, [180, 180]], l: [[0, 0], [1, 1]], ring: { at: 'ankles', rx: 3, ry: 8 } },
+        { h: [150, 105], t: 180, hd: 180, a: [{ to: [142, 98], b: -1 }, [180, 180]], l: [[-20, -20], [-14, -14]], ring: { at: 'ankles', rx: 3, ry: 8 } }]
     },
 
     // ===== FULL BODY / WARM-UP / COOL-DOWN =====

@@ -117,12 +117,13 @@
     if (!p.minutes) p.minutes = 30;
     if (p.level === undefined) p.level = 1;
     if (p.weights === undefined) p.weights = true;
+    if (p.ring === undefined) p.ring = false;
     return p;
   }
 
   function build(o) {
     var L = LEVELS[o.level];
-    var r = rng(hash([o.focus.slice().sort().join(), o.minutes, o.level, o.weights ? 1 : 0, todayStr(), state.shuffle || 0].join('|')));
+    var r = rng(hash([o.focus.slice().sort().join(), o.minutes, o.level, o.weights ? 1 : 0, o.ring ? 1 : 0, todayStr(), state.shuffle || 0].join('|')));
     var maxLvl = o.level === 0 ? 2 : 3;
     var groups = o.focus.indexOf('full') >= 0 ? ['abs', 'arms', 'legs'] : o.focus.slice();
     var warmN = o.minutes >= 45 ? 4 : o.minutes >= 25 ? 3 : 2;
@@ -147,13 +148,14 @@
     var rounds0 = o.minutes <= 20 ? 1 : o.minutes <= 35 ? 2 : 3;
     var target = clamp(Math.round(slots / rounds0), 4, 14);
 
-    var pool = EX.filter(function (e) { return e.use.indexOf('main') >= 0 && e.lvl <= maxLvl && !used[e.id]; });
+    var pool = EX.filter(function (e) { return e.use.indexOf('main') >= 0 && e.lvl <= maxLvl && !used[e.id] && (!e.ring || o.ring); });
     var lists = {};
     groups.forEach(function (g) {
       var l = shuffle(pool.filter(function (e) { return e.g.indexOf(g) >= 0; }), r);
       if (o.level === 0) l.sort(function (a, b) { return a.lvl - b.lvl; });
       if (o.level === 2) l.sort(function (a, b) { return (b.lvl >= 2 ? 1 : 0) - (a.lvl >= 2 ? 1 : 0); });
       if (!o.weights) l.sort(function (a, b) { return (a.w ? 1 : 0) - (b.w ? 1 : 0); });
+      if (o.ring) l.sort(function (a, b) { return (b.ring ? 1 : 0) - (a.ring ? 1 : 0); });
       lists[g] = l;
     });
     var chosen = [], picked = {}, guard = 0;
@@ -193,6 +195,7 @@
     var figs = MD.figures(ex);
     var d = opts.work ? dose(ex, opts.work, opts.o) : null;
     var weightNote = ex.w ? (opts.o && !opts.o.weights ? '<span class="tag w">No weights today</span>' : '<span class="tag w">Light weights</span>') : '';
+    if (ex.ring) weightNote += '<span class="tag w">Pilates ring</span>';
     return '<article class="card" id="ex-' + ex.id + '">' +
       '<div class="figs"><div><small>Start</small>' + figs[0] + '</div><div><small>Move</small>' + figs[1] + '</div></div>' +
       '<div class="card-body"><div class="card-top"><h3>' + esc(ex.name) + '</h3>' + (d ? '<span class="dose num">' + d.text + '</span>' : '') + '</div>' +
@@ -218,6 +221,7 @@
     $('#chips-time').innerHTML = TIMES.map(function (m) { return chip(m + ' min', p.minutes === m, 'data-time="' + m + '"'); }).join('');
     $('#chips-level').innerHTML = LEVELS.map(function (l, i) { return chip(l.label, p.level === i, 'data-level="' + i + '" title="' + l.note + '"'); }).join('');
     $('#chips-weights').innerHTML = chip('No weights', !p.weights, 'data-weights="0"') + chip('Light weights', p.weights, 'data-weights="1"');
+    $('#chips-ring').innerHTML = chip('No ring', !p.ring, 'data-ring="0"') + chip('I have a ring', p.ring, 'data-ring="1"');
   }
 
   function renderSuggest() {
@@ -261,11 +265,12 @@
   // ---------- Library ----------
   var libFilter = 'all';
   function renderLibrary() {
-    var filters = [['all', 'All moves'], ['abs', 'Abs'], ['arms', 'Arms'], ['legs', 'Legs & glutes'], ['weights', 'With weights'], ['stretch', 'Warm-up & cool-down']];
+    var filters = [['all', 'All moves'], ['abs', 'Abs'], ['arms', 'Arms'], ['legs', 'Legs & glutes'], ['weights', 'With weights'], ['ring', 'Pilates ring'], ['stretch', 'Warm-up & cool-down']];
     $('#lib-filters').innerHTML = filters.map(function (f) { return chip(f[1], libFilter === f[0], 'data-lib="' + f[0] + '"'); }).join('');
     var list = EX.filter(function (e) {
       if (libFilter === 'all') return true;
       if (libFilter === 'weights') return !!e.w;
+      if (libFilter === 'ring') return !!e.ring;
       if (libFilter === 'stretch') return e.use.indexOf('warm') >= 0 || e.use.indexOf('cool') >= 0;
       return e.g.indexOf(libFilter) >= 0;
     });
@@ -429,6 +434,7 @@
     var s = run.steps[run.i], isRest = s.kind === 'rest', ex = isRest ? s.showEx : s.ex;
     var d = isRest ? null : dose(ex, s.work, run.plan.o);
     var wt = ex.w ? (run.plan.o.weights ? ' Grab your light weights.' : ' No weights: squeeze your fists and move slowly.') : '';
+    if (ex.ring) wt += ' Grab your Pilates ring.';
     var nextStep = null;
     for (var k = run.i + 1; k < run.steps.length; k++) { if (run.steps[k].kind === 'work' && run.steps[k].ex !== ex) { nextStep = run.steps[k]; break; } }
     var html =
@@ -520,6 +526,7 @@
     }
     if (el.dataset.time) { p.minutes = +el.dataset.time; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.level) { p.level = +el.dataset.level; save(); renderSuggest(); renderBuilder(); renderPlan(); return; }
+    if (el.dataset.ring) { p.ring = el.dataset.ring === '1'; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.weights) { p.weights = el.dataset.weights === '1'; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.lib) { libFilter = el.dataset.lib; renderLibrary(); return; }
     if (el.dataset.day) { selDay = el.dataset.day; renderTracker(); return; }
