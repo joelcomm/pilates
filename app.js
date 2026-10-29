@@ -118,44 +118,53 @@
     if (p.level === undefined) p.level = 1;
     if (p.weights === undefined) p.weights = true;
     if (p.ring === undefined) p.ring = false;
+    if (p.roller === undefined) p.roller = false;
+    if (p.rest === undefined) p.rest = true;
+    if (p.voice === undefined) p.voice = true;
+    if (p.music === undefined) p.music = true;
+    if (p.beeps === undefined) p.beeps = true;
     return p;
   }
 
   function build(o) {
     var L = LEVELS[o.level];
-    var r = rng(hash([o.focus.slice().sort().join(), o.minutes, o.level, o.weights ? 1 : 0, o.ring ? 1 : 0, todayStr(), state.shuffle || 0].join('|')));
+    var r = rng(hash([o.focus.slice().sort().join(), o.minutes, o.level, o.weights ? 1 : 0, o.ring ? 1 : 0, o.roller ? 1 : 0, o.rest ? 1 : 0, todayStr(), state.shuffle || 0].join('|')));
     var maxLvl = o.level === 0 ? 2 : 3;
     var groups = o.focus.indexOf('full') >= 0 ? ['abs', 'arms', 'legs'] : o.focus.slice();
     var warmN = o.minutes >= 45 ? 4 : o.minutes >= 25 ? 3 : 2;
     var coolN = o.minutes >= 45 ? 3 : 2;
     var used = {};
+    var gear = function (e) { return (!e.ring || o.ring) && (!e.roller || o.roller); };
+    var gearFirst = function (l) { return (o.ring || o.roller) ? l.sort(function (x, y) { return ((y.ring || y.roller) ? 1 : 0) - ((x.ring || x.roller) ? 1 : 0); }) : l; };
+    var restS = o.rest ? L.rest : 0;
 
-    var coolPool = EX.filter(function (e) { return e.use.indexOf('cool') >= 0; });
+    var coolPool = EX.filter(function (e) { return e.use.indexOf('cool') >= 0 && gear(e); });
     var cool = [BY('child')];
     used.child = 1;
-    shuffle(coolPool.filter(function (e) { return !used[e.id]; }), r).slice(0, coolN - 1).forEach(function (e) { cool.push(e); used[e.id] = 1; });
+    gearFirst(shuffle(coolPool.filter(function (e) { return !used[e.id]; }), r)).slice(0, coolN - 1).forEach(function (e) { cool.push(e); used[e.id] = 1; });
     cool.sort(function (a, b) { return (a.co === undefined ? 2 : a.co) - (b.co === undefined ? 2 : b.co); });
 
-    var warmPool = EX.filter(function (e) { return e.use.indexOf('warm') >= 0 && !used[e.id]; });
+    var warmPool = EX.filter(function (e) { return e.use.indexOf('warm') >= 0 && !used[e.id] && gear(e); });
     var warm = shuffle(warmPool, r).slice(0, warmN);
     warm.forEach(function (e) { used[e.id] = 1; });
     warm.sort(function (a, b) { return (a.wo === undefined ? 9 : a.wo) - (b.wo === undefined ? 9 : b.wo); });
 
-    var warmSec = warm.length * 45, coolSec = cool.length * 50;
+    var wr = o.rest ? 5 : 0;
+    var warmSec = warm.length * (40 + wr), coolSec = cool.length * (45 + wr);
     var mainSec = Math.max(o.minutes * 60 - warmSec - coolSec, 240);
-    var slot = L.work + L.rest;
+    var slot = L.work + restS;
     var slots = Math.floor(mainSec / slot);
     var rounds0 = o.minutes <= 20 ? 1 : o.minutes <= 35 ? 2 : 3;
     var target = clamp(Math.round(slots / rounds0), 4, 14);
 
-    var pool = EX.filter(function (e) { return e.use.indexOf('main') >= 0 && e.lvl <= maxLvl && !used[e.id] && (!e.ring || o.ring); });
+    var pool = EX.filter(function (e) { return e.use.indexOf('main') >= 0 && e.lvl <= maxLvl && !used[e.id] && gear(e); });
     var lists = {};
     groups.forEach(function (g) {
       var l = shuffle(pool.filter(function (e) { return e.g.indexOf(g) >= 0; }), r);
       if (o.level === 0) l.sort(function (a, b) { return a.lvl - b.lvl; });
       if (o.level === 2) l.sort(function (a, b) { return (b.lvl >= 2 ? 1 : 0) - (a.lvl >= 2 ? 1 : 0); });
       if (!o.weights) l.sort(function (a, b) { return (a.w ? 1 : 0) - (b.w ? 1 : 0); });
-      if (o.ring) l.sort(function (a, b) { return (b.ring ? 1 : 0) - (a.ring ? 1 : 0); });
+      gearFirst(l);
       lists[g] = l;
     });
     var chosen = [], picked = {}, guard = 0;
@@ -168,13 +177,20 @@
       }
       if (!progressed) break;
     }
-    chosen = chosen.map(function (e, i) { return { e: e, i: i }; })
+    // Try a few move counts and keep the one whose total lands closest to the requested time.
+    var best = null;
+    for (var n = chosen.length; n >= Math.max(4, chosen.length - 4); n--) {
+      var ratio = mainSec / (n * slot), rr = Math.max(1, Math.floor(ratio));
+      if (Math.abs(ratio - (rr + 1)) < Math.abs(ratio - rr)) rr++;
+      var err = Math.abs(warmSec + coolSec + rr * n * slot - o.minutes * 60);
+      if (!best || err < best.err - 20) best = { n: n, rounds: rr, err: err };
+    }
+    chosen = chosen.slice(0, best.n).map(function (e, i) { return { e: e, i: i }; })
       .sort(function (a, b) { return (POS[a.e.pos] - POS[b.e.pos]) || (a.i - b.i); })
       .map(function (x) { return x.e; });
-    var ratio = mainSec / (chosen.length * slot), rounds = Math.max(1, Math.floor(ratio));
-    if (Math.abs(ratio - (rounds + 1)) < Math.abs(ratio - rounds)) rounds++;
+    var rounds = best.rounds;
     var total = warmSec + coolSec + rounds * chosen.length * slot;
-    return { o: o, L: L, warm: warm, cool: cool, main: chosen, rounds: rounds, warmSec: warmSec, coolSec: coolSec, total: total };
+    return { o: o, L: L, restS: restS, warm: warm, cool: cool, main: chosen, rounds: rounds, warmSec: warmSec, coolSec: coolSec, total: total };
   }
   function BY(id) { return MD.BY_ID[id]; }
 
@@ -196,6 +212,7 @@
     var d = opts.work ? dose(ex, opts.work, opts.o) : null;
     var weightNote = ex.w ? (opts.o && !opts.o.weights ? '<span class="tag w">No weights today</span>' : '<span class="tag w">Light weights</span>') : '';
     if (ex.ring) weightNote += '<span class="tag w">Pilates ring</span>';
+    if (ex.roller) weightNote += '<span class="tag w">Foam roller</span>';
     return '<article class="card" id="ex-' + ex.id + '">' +
       '<div class="figs"><div><small>Start</small>' + figs[0] + '</div><div><small>Move</small>' + figs[1] + '</div></div>' +
       '<div class="card-body"><div class="card-top"><h3>' + esc(ex.name) + '</h3>' + (d ? '<span class="dose num">' + d.text + '</span>' : '') + '</div>' +
@@ -222,6 +239,8 @@
     $('#chips-level').innerHTML = LEVELS.map(function (l, i) { return chip(l.label, p.level === i, 'data-level="' + i + '" title="' + l.note + '"'); }).join('');
     $('#chips-weights').innerHTML = chip('No weights', !p.weights, 'data-weights="0"') + chip('Light weights', p.weights, 'data-weights="1"');
     $('#chips-ring').innerHTML = chip('No ring', !p.ring, 'data-ring="0"') + chip('I have a ring', p.ring, 'data-ring="1"');
+    $('#chips-roller').innerHTML = chip('No roller', !p.roller, 'data-roller="0"') + chip('I have a roller', p.roller, 'data-roller="1"');
+    $('#chips-rest').innerHTML = chip('Short rest', p.rest, 'data-rest="1"') + chip('No rest', !p.rest, 'data-rest="0"');
   }
 
   function renderSuggest() {
@@ -244,7 +263,7 @@
       '<div class="plan-head"><div><p class="eyebrow">Your workout</p><h2>' + esc(focusLabel(p.focus)) + ' · ' + p.minutes + ' min · ' + L.label + '</h2>' +
       '<div class="plan-meta num"><span><b>' + (plan.warm.length + plan.main.length + plan.cool.length) + '</b> moves</span>' +
       '<span><b>' + plan.main.length + '</b> moves × <b>' + rounds + '</b> ' + (rounds === 1 ? 'round' : 'rounds') + '</span>' +
-      '<span><b>' + L.work + '</b> sec work / <b>' + L.rest + '</b> sec rest</span>' +
+      '<span><b>' + L.work + '</b> sec work' + (plan.restS ? ' / <b>' + plan.restS + '</b> sec rest' : ', no rest between moves') + '</span>' +
       '<span>About <b>' + minsLabel(plan.total) + '</b></span></div></div>' +
       '<div class="plan-actions"><button type="button" class="btn" data-act="start">Start guided workout</button>' +
       '<button type="button" class="btn ghost" data-act="shuffle">Shuffle moves</button>' +
@@ -265,12 +284,13 @@
   // ---------- Library ----------
   var libFilter = 'all';
   function renderLibrary() {
-    var filters = [['all', 'All moves'], ['abs', 'Abs'], ['arms', 'Arms'], ['legs', 'Legs & glutes'], ['weights', 'With weights'], ['ring', 'Pilates ring'], ['stretch', 'Warm-up & cool-down']];
+    var filters = [['all', 'All moves'], ['abs', 'Abs'], ['arms', 'Arms'], ['legs', 'Legs & glutes'], ['weights', 'With weights'], ['ring', 'Pilates ring'], ['roller', 'Foam roller'], ['stretch', 'Warm-up & cool-down']];
     $('#lib-filters').innerHTML = filters.map(function (f) { return chip(f[1], libFilter === f[0], 'data-lib="' + f[0] + '"'); }).join('');
     var list = EX.filter(function (e) {
       if (libFilter === 'all') return true;
       if (libFilter === 'weights') return !!e.w;
       if (libFilter === 'ring') return !!e.ring;
+      if (libFilter === 'roller') return !!e.roller;
       if (libFilter === 'stretch') return e.use.indexOf('warm') >= 0 || e.use.indexOf('cool') >= 0;
       return e.g.indexOf(libFilter) >= 0;
     });
@@ -371,37 +391,134 @@
   }
 
   // ---------- guided player ----------
-  var run = null, audio = null, soundOn = true, wake = null;
-  function beep(f, d) {
-    if (!soundOn) return;
+  var run = null, audio = null, wake = null, mus = null, speaking = false;
+
+  function getAudio() {
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      var o = audio.createOscillator(), g = audio.createGain();
-      o.frequency.value = f; o.connect(g); g.connect(audio.destination);
-      g.gain.setValueAtTime(0.0001, audio.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.25, audio.currentTime + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + d);
-      o.start(); o.stop(audio.currentTime + d + 0.02);
+      if (audio.state === 'suspended') audio.resume();
     } catch (e) { /* audio unavailable */ }
+    return audio;
+  }
+  function beep(f, d) {
+    if (!prefs().beeps) return;
+    var c = getAudio(); if (!c) return;
+    try {
+      var o = c.createOscillator(), g = c.createGain();
+      o.frequency.value = f; o.connect(g); g.connect(c.destination);
+      g.gain.setValueAtTime(0.0001, c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.25, c.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + d);
+      o.start(); o.stop(c.currentTime + d + 0.02);
+    } catch (e) { /* ignore */ }
+  }
+
+  // Background music made on the fly: soft pad chords, a light arpeggio and, at higher intensity, a gentle beat.
+  var CHORDS = [[57, 60, 64, 67], [53, 57, 60, 64], [48, 52, 55, 59], [55, 59, 62, 66]];
+  var ARP = [0, 2, 1, 3, 2, 1, 3, 2];
+  var mtof = function (m) { return 440 * Math.pow(2, (m - 69) / 12); };
+  function tone(c, dest, freq, type, t, dur, gain, attack) {
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.value = freq; o.connect(g); g.connect(dest);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(gain, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function musicTarget() { return !mus ? 0 : (run && run.paused ? 0.0001 : speaking ? 0.12 : 0.5); }
+  function musicApply() {
+    if (!mus) return;
+    var g = mus.master.gain, t = mus.c.currentTime;
+    try { g.cancelScheduledValues(t); g.setValueAtTime(Math.max(g.value, 0.0001), t); g.linearRampToValueAtTime(musicTarget(), t + 0.4); } catch (e) { /* ignore */ }
+  }
+  function musicStart(level) {
+    var c = getAudio(); if (!c || mus) return;
+    try {
+      var master = c.createGain(); master.gain.value = 0.0001; master.connect(c.destination);
+      var echo = c.createDelay(); echo.delayTime.value = 0.33;
+      var fb = c.createGain(); fb.gain.value = 0.32; var wet = c.createGain(); wet.gain.value = 0.45;
+      echo.connect(fb); fb.connect(echo); echo.connect(wet); wet.connect(master);
+      var padF = c.createBiquadFilter(); padF.type = 'lowpass'; padF.frequency.value = 900; padF.connect(master);
+      var bpm = [80, 92, 104][level], hatBuf = c.createBuffer(1, c.sampleRate * 0.05, c.sampleRate), d = hatBuf.getChannelData(0);
+      for (var k = 0; k < d.length; k++) d[k] = (Math.random() * 2 - 1) * (1 - k / d.length);
+      mus = { c: c, master: master, echo: echo, pad: padF, hat: hatBuf, level: level, step: 0, next: c.currentTime + 0.15, dur: 60 / bpm / 2, timer: null };
+      mus.timer = setInterval(musicTick, 100);
+      musicApply();
+    } catch (e) { mus = null; }
+  }
+  function musicTick() {
+    if (!mus) return;
+    var c = mus.c;
+    while (mus.next < c.currentTime + 0.6) {
+      var t = mus.next, n = mus.step, chord = CHORDS[Math.floor(n / 8) % 4], dur = mus.dur;
+      if (n % 8 === 0) chord.slice(0, 3).forEach(function (m, i) { tone(c, mus.pad, mtof(m - 12 + (i === 2 ? 0 : 0)), 'triangle', t, dur * 8, 0.09, 0.5); });
+      if (mus.level > 0 || n % 2 === 0) {
+        var note = mtof(chord[ARP[n % 8]] + 12), g = tone;
+        g(c, mus.master, note, 'triangle', t, dur * 2.2, 0.05, 0.01);
+        g(c, mus.echo, note, 'triangle', t, dur * 2.2, 0.04, 0.01);
+      }
+      if (mus.level > 0 && n % 2 === 0) {
+        var o = c.createOscillator(), kg = c.createGain();
+        o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+        kg.gain.setValueAtTime(mus.level === 2 ? 0.3 : 0.2, t); kg.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+        o.connect(kg); kg.connect(mus.master); o.start(t); o.stop(t + 0.2);
+      }
+      if (mus.level > 0 && n % 2 === 1) {
+        var src = c.createBufferSource(), hg = c.createGain(), hp = c.createBiquadFilter();
+        src.buffer = mus.hat; hp.type = 'highpass'; hp.frequency.value = 6000; hg.gain.value = 0.05;
+        src.connect(hp); hp.connect(hg); hg.connect(mus.master); src.start(t);
+      }
+      mus.next += dur; mus.step++;
+    }
+  }
+  function musicStop() {
+    if (!mus) return;
+    var m = mus; mus = null; clearInterval(m.timer);
+    try { m.master.gain.cancelScheduledValues(m.c.currentTime); m.master.gain.linearRampToValueAtTime(0.0001, m.c.currentTime + 0.6); setTimeout(function () { try { m.master.disconnect(); } catch (e) { /* ignore */ } }, 900); } catch (e) { /* ignore */ }
+  }
+
+  // Spoken prompts.
+  function pickVoice() {
+    try {
+      var vs = speechSynthesis.getVoices().filter(function (v) { return /^en/i.test(v.lang); });
+      var pref = ['Samantha', 'Ava', 'Allison', 'Karen', 'Serena', 'Moira', 'Daniel'];
+      for (var i = 0; i < pref.length; i++) { var f = vs.filter(function (v) { return v.name.indexOf(pref[i]) >= 0; })[0]; if (f) return f; }
+      return vs[0] || null;
+    } catch (e) { return null; }
+  }
+  function say(text) {
+    if (!prefs().voice || !('speechSynthesis' in window)) return;
+    try {
+      var u = new SpeechSynthesisUtterance(text), v = pickVoice();
+      if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'en-US';
+      u.rate = 1;
+      u.onstart = function () { speaking = true; musicApply(); };
+      u.onend = u.onerror = function () { speaking = false; musicApply(); };
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+    } catch (e) { /* ignore */ }
+  }
+  function spokenDose(ex, work) {
+    if (ex.kind === 'hold') return 'for ' + work + ' seconds';
+    var per = ex.sides ? work / 2 : work, reps = Math.max(4, Math.round(per / ex.tempo));
+    return reps + (ex.sides ? ' reps each side' : ' reps');
   }
 
   function buildSteps(plan) {
     var steps = [], p = plan.o;
     function add(ex, work, rest, section, round) {
       var base = { ex: ex, section: section, round: round };
-      var cue = ex.cues[0];
       if (ex.sides) {
-        steps.push(Object.assign({}, base, { kind: 'work', dur: work / 2, side: 'Right side', work: work, cue: cue }));
-        steps.push(Object.assign({}, base, { kind: 'work', dur: work / 2, side: 'Left side', work: work, cue: cue }));
-      } else steps.push(Object.assign({}, base, { kind: 'work', dur: work, work: work, cue: cue }));
+        steps.push(Object.assign({}, base, { kind: 'work', dur: work / 2, side: 'Right side', work: work }));
+        steps.push(Object.assign({}, base, { kind: 'work', dur: work / 2, side: 'Left side', work: work }));
+      } else steps.push(Object.assign({}, base, { kind: 'work', dur: work, work: work }));
       if (rest > 0) steps.push(Object.assign({}, base, { kind: 'rest', dur: rest }));
     }
-    plan.warm.forEach(function (e) { add(e, 40, 5, 'Warm-up'); });
-    for (var r = 1; r <= plan.rounds; r++) plan.main.forEach(function (e) { add(e, plan.L.work, plan.L.rest, 'Round ' + r + ' of ' + plan.rounds, r); });
-    plan.cool.forEach(function (e, i) { add(e, 45, i === plan.cool.length - 1 ? 0 : 5, 'Cool-down'); });
-    // rest steps preview the next move
+    var wr = p.rest ? 5 : 0;
+    plan.warm.forEach(function (e) { add(e, 40, wr, 'Warm-up'); });
+    for (var r = 1; r <= plan.rounds; r++) plan.main.forEach(function (e) { add(e, plan.L.work, plan.restS, 'Round ' + r + ' of ' + plan.rounds, r); });
+    plan.cool.forEach(function (e, i) { add(e, 45, i === plan.cool.length - 1 ? 0 : wr, 'Cool-down'); });
     for (var i = 0; i < steps.length; i++) {
-      if (steps[i].kind === 'rest') { var n = steps[i + 1]; steps[i].next = n ? n.ex : null; steps[i].showEx = n ? n.ex : steps[i].ex; }
+      if (steps[i].kind === 'rest') { var n = steps[i + 1]; steps[i].showEx = n ? n.ex : steps[i].ex; }
     }
     return steps;
   }
@@ -415,6 +532,8 @@
     document.body.style.overflow = 'hidden';
     $('#player').hidden = false;
     try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }, function () { }); } catch (e) { /* optional */ }
+    getAudio();
+    if (prefs().music) musicStart(currentPlan.o.level);
     beep(660, 0.12);
     gotoStep(0);
     run.timer = setInterval(tick, 200);
@@ -422,32 +541,49 @@
 
   function elapsedBefore(i) { var n = 0; for (var k = 0; k < i; k++) n += run.steps[k].dur; return n; }
 
+  function nextWork(from) {
+    for (var k = from + 1; k < run.steps.length; k++) if (run.steps[k].kind === 'work') return run.steps[k];
+    return null;
+  }
+
+  function announce(s, first) {
+    var ex = s.kind === 'rest' ? s.showEx : s.ex;
+    if (s.kind === 'rest') { say('Rest. Next up, ' + ex.name + '.'); return; }
+    if (s.side === 'Left side') { say('Switch sides.'); return; }
+    var gear = ex.ring ? ' Grab your ring.' : ex.roller ? ' Grab your roller.' : ex.w && run.plan.o.weights ? ' Grab your weights.' : '';
+    say((first ? 'Let\'s begin. ' : '') + ex.name + '. ' + spokenDose(ex, s.work) + (s.side ? ', starting on your right.' : '.') + gear);
+  }
+
   function gotoStep(i) {
     if (i >= run.steps.length) return finishRun();
     run.i = clamp(i, 0, run.steps.length - 1);
     run.left = run.steps[run.i].dur;
     run.last = Date.now();
     drawStep();
+    announce(run.steps[run.i], run.i === 0);
+  }
+
+  function toggleBtn(act, label, on) {
+    return '<button type="button" class="btn ghost sm" data-act="' + act + '" aria-pressed="' + on + '">' + label + (on ? ' on' : ' off') + '</button>';
   }
 
   function drawStep() {
-    var s = run.steps[run.i], isRest = s.kind === 'rest', ex = isRest ? s.showEx : s.ex;
+    var s = run.steps[run.i], isRest = s.kind === 'rest', ex = isRest ? s.showEx : s.ex, P = prefs();
     var d = isRest ? null : dose(ex, s.work, run.plan.o);
     var wt = ex.w ? (run.plan.o.weights ? ' Grab your light weights.' : ' No weights: squeeze your fists and move slowly.') : '';
     if (ex.ring) wt += ' Grab your Pilates ring.';
-    var nextStep = null;
-    for (var k = run.i + 1; k < run.steps.length; k++) { if (run.steps[k].kind === 'work' && run.steps[k].ex !== ex) { nextStep = run.steps[k]; break; } }
+    if (ex.roller) wt += ' Grab your foam roller.';
     var html =
-      '<div class="p-top"><button type="button" class="btn ghost sm" data-act="p-end">End</button><div class="p-prog"><span id="p-bar"></span></div><span class="p-left num" id="p-left"></span>' +
-      '<button type="button" class="btn ghost sm" data-act="p-sound" aria-pressed="' + soundOn + '">' + (soundOn ? 'Sound on' : 'Sound off') + '</button></div>' +
+      '<div class="p-top"><button type="button" class="btn ghost sm" data-act="p-end">End</button><div class="p-prog"><span id="p-bar"></span></div><span class="p-left num" id="p-left"></span></div>' +
+      '<div class="p-toggles">' + toggleBtn('p-music', 'Music', P.music) + toggleBtn('p-voice', 'Voice', P.voice) + toggleBtn('p-beeps', 'Beeps', P.beeps) + '</div>' +
       '<div class="p-main"><div class="p-fig anim">' + figPair(ex) + '</div><div class="p-info">' +
       '<span class="phase' + (isRest ? ' rest' : '') + '">' + (isRest ? 'Rest · get ready' : (s.side ? s.side : 'Work')) + '</span>' +
       '<h2>' + esc(ex.name) + '</h2>' +
       '<div class="p-time num" id="p-time"></div>' +
-      (isRest ? '<p class="p-dose">Next: ' + esc(ex.name) + '</p>' : '<p class="p-dose num">' + d.text + (ex.sides ? '' : '') + '</p>') +
+      (isRest ? '<p class="p-dose">Next: ' + esc(ex.name) + '</p>' : '<p class="p-dose num">' + d.text + '</p>') +
       '<p class="p-cue">' + (isRest ? esc(ex.blurb) : esc(ex.steps[1] || ex.steps[0]) + wt) + '</p>' +
       '<p class="p-cue"><b>Think:</b> ' + esc(ex.cues[0]) + '</p></div></div>' +
-      '<p class="p-next">' + esc(s.section) + (nextStep && !isRest ? ' · Next: <b>' + esc(nextStep.ex.name) + '</b>' : '') + '</p>' +
+      '<p class="p-next" id="p-up"></p>' +
       '<div class="p-ctl"><button type="button" class="btn ghost" data-act="p-prev">Back</button><button type="button" class="btn big" data-act="p-pause" id="p-pause">' + (run.paused ? 'Resume' : 'Pause') + '</button><button type="button" class="btn ghost" data-act="p-skip">Skip</button></div>';
     $('#player').innerHTML = html;
     updateTime();
@@ -455,23 +591,35 @@
 
   function updateTime() {
     if (!run || run.done) return;
-    var left = Math.max(0, Math.ceil(run.left));
+    var s = run.steps[run.i], left = Math.max(0, Math.ceil(run.left));
     var t = $('#p-time'); if (t) t.textContent = Math.floor(left / 60) + ':' + pad2(left % 60);
-    var elapsed = elapsedBefore(run.i) + (run.steps[run.i].dur - run.left);
+    var elapsed = elapsedBefore(run.i) + (s.dur - run.left);
     var bar = $('#p-bar'); if (bar) bar.style.width = clamp(elapsed / run.total * 100, 0, 100) + '%';
     var pl = $('#p-left'); if (pl) pl.textContent = Math.ceil((run.total - elapsed) / 60) + ' min left';
+    var up = $('#p-up');
+    if (up) {
+      var nx = s.kind === 'rest' ? run.steps[run.i + 1] : nextWork(run.i), same = nx && nx.ex === s.ex && s.kind !== 'rest';
+      var nxStep = run.steps[run.i + 1];
+      var soon = s.kind === 'work' && nxStep && nxStep.kind === 'work' && left <= 10 && nxStep.ex !== s.ex;
+      up.classList.toggle('soon', !!soon);
+      up.innerHTML = esc(s.section) + (nx && !same ? ' · Next: <b>' + esc(nx.ex.name) + '</b>' + (soon || (s.kind === 'rest' && left <= 10) ? ' in ' + left : '') : (same ? ' · Next: <b>switch sides</b>' + (left <= 10 ? ' in ' + left : '') : ' · Last move'));
+    }
   }
 
   function tick() {
     if (!run || run.done) return;
     var now = Date.now(), dt = (now - run.last) / 1000; run.last = now;
     if (run.paused) return;
-    var before = Math.ceil(run.left);
+    var s = run.steps[run.i], before = Math.ceil(run.left);
     run.left -= dt;
     var after = Math.ceil(run.left);
     if (after !== before && after > 0 && after <= 3) beep(520, 0.08);
+    if (s.kind === 'work' && !s.heads && run.left <= 10 && s.dur >= 14) {
+      var nx = run.steps[run.i + 1];
+      if (nx && nx.kind === 'work' && nx.ex !== s.ex) { s.heads = true; say('Next up, ' + nx.ex.name + '.'); }
+    }
     if (run.left <= 0) {
-      var cur = run.steps[run.i], nxt = run.steps[run.i + 1];
+      var nxt = run.steps[run.i + 1];
       if (nxt && nxt.kind === 'work') beep(880, 0.25);
       gotoStep(run.i + 1);
       return;
@@ -480,8 +628,9 @@
   }
 
   function finishRun() {
-    run.done = true; clearInterval(run.timer);
+    run.done = true; clearInterval(run.timer); musicStop();
     beep(660, 0.15); setTimeout(function () { beep(880, 0.3); }, 180);
+    say('Workout complete. Nice work.');
     var p = run.plan.o, mins = Math.round(run.total / 60);
     $('#player').innerHTML = '<div class="p-done"><p class="eyebrow">Workout complete</p><h1>Nice work.</h1>' +
       '<p class="blurb">' + esc(focusLabel(p.focus)) + ' · ' + mins + ' min · ' + LEVELS[p.level].label + '. How did it feel?</p>' +
@@ -491,6 +640,8 @@
 
   function closePlayer() {
     if (run) { clearInterval(run.timer); run = null; }
+    musicStop(); speaking = false;
+    try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) { /* ignore */ }
     $('#player').hidden = true; $('#player').innerHTML = '';
     document.body.style.overflow = '';
     try { if (wake) { wake.release(); wake = null; } } catch (e) { /* optional */ }
@@ -526,6 +677,8 @@
     }
     if (el.dataset.time) { p.minutes = +el.dataset.time; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.level) { p.level = +el.dataset.level; save(); renderSuggest(); renderBuilder(); renderPlan(); return; }
+    if (el.dataset.roller) { p.roller = el.dataset.roller === '1'; save(); renderBuilder(); renderPlan(); return; }
+    if (el.dataset.rest) { p.rest = el.dataset.rest === '1'; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.ring) { p.ring = el.dataset.ring === '1'; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.weights) { p.weights = el.dataset.weights === '1'; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.lib) { libFilter = el.dataset.lib; renderLibrary(); return; }
@@ -547,10 +700,15 @@
     else if (act === 'quicklog') { logPlan(null, 'quick'); toast('Logged ' + Math.round(currentPlan.total / 60) + ' min to your tracker'); }
     else if (act === 'p-end') { if (run && !run.done && el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Tap again to end'; setTimeout(function () { el.dataset.sure = ''; el.textContent = 'End'; }, 3000); } else closePlayer(); }
     else if (act === 'p-close') closePlayer();
-    else if (act === 'p-pause') { run.paused = !run.paused; run.last = Date.now(); $('#p-pause').textContent = run.paused ? 'Resume' : 'Pause'; }
+    else if (act === 'p-pause') { run.paused = !run.paused; run.last = Date.now(); $('#p-pause').textContent = run.paused ? 'Resume' : 'Pause'; musicApply(); try { if (run.paused && 'speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
     else if (act === 'p-skip') gotoStep(run.i + 1);
     else if (act === 'p-prev') gotoStep(run.left < run.steps[run.i].dur - 2 ? run.i : Math.max(0, run.i - 1));
-    else if (act === 'p-sound') { soundOn = !soundOn; el.textContent = soundOn ? 'Sound on' : 'Sound off'; el.setAttribute('aria-pressed', soundOn); }
+    else if (act === 'p-music' || act === 'p-voice' || act === 'p-beeps') {
+      var key = act.slice(2); p[key] = !p[key]; save();
+      el.textContent = el.textContent.replace(/ (on|off)$/, p[key] ? ' on' : ' off'); el.setAttribute('aria-pressed', p[key]);
+      if (key === 'music') { if (p.music && run && !run.done) musicStart(run.plan.o.level); else musicStop(); }
+      if (key === 'voice' && !p.voice) { try { speechSynthesis.cancel(); } catch (e) { /* ignore */ } speaking = false; musicApply(); }
+    }
     else if (act === 'copy-backup') {
       var ta = $('#bk-out');
       var done = function () { toast('Backup copied'); };

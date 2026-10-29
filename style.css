@@ -19,6 +19,8 @@
   --fig-far: #8FA19B;
   --mat: #BEDBD2;
   --wt: #E58A2E;
+  --skin: #E2A883; --skin-far: #C98E69; --hair: #5B3B27; --tank: #25282D; --legging: #3F64E6; --legging-far: #2F4FC4;
+  --shoe: #F1ECE2; --shoe-far: #D2CBBC; --sole: #B88C5C; --roller: #6C8F9B; --roller-line: #4D6C78;
   --danger: #B03A2A;
   --display: 'Bricolage Grotesque', 'Avenir Next', 'Trebuchet MS', system-ui, sans-serif;
   --body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -29,6 +31,7 @@
     --line: #26362F; --accent: #5FCBB3; --accent-ink: #0B1613; --accent-soft: #1B3A33;
     --pop: #F0A458; --pop-soft: #3A2B18; --c-abs: #4CC2A8; --c-arms: #F0A458; --c-legs: #9AA5F0;
     --fig: #E8F0EC; --fig-far: #62756E; --mat: #24483F; --wt: #F0A458; --danger: #F08A78;
+    --tank: #454B53; --skin: #E8B08C; --skin-far: #C99069; --roller: #7FA3AF; --roller-line: #5C8190;
     color-scheme: dark;
   }
 }
@@ -37,6 +40,7 @@
   --line: #26362F; --accent: #5FCBB3; --accent-ink: #0B1613; --accent-soft: #1B3A33;
   --pop: #F0A458; --pop-soft: #3A2B18; --c-abs: #4CC2A8; --c-arms: #F0A458; --c-legs: #9AA5F0;
   --fig: #E8F0EC; --fig-far: #62756E; --mat: #24483F; --wt: #F0A458; --danger: #F08A78;
+  --tank: #454B53; --skin: #E8B08C; --skin-far: #C99069; --roller: #7FA3AF; --roller-line: #5C8190;
   color-scheme: dark;
 }
 
@@ -120,10 +124,23 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .figs > div { position: relative; background: var(--panel); }
 .figs small { position: absolute; left: 8px; top: 6px; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .fig { display: block; width: 100%; height: auto; }
-.fig .body { stroke: var(--fig); fill: none; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
-.fig .torso { stroke-width: 9; }
-.fig .far { stroke: var(--fig-far); fill: none; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
-.fig .head { fill: var(--fig); }
+.fig line, .fig polyline { stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.fig .tank { stroke: var(--tank); stroke-width: 11.5; }
+.fig .thigh { stroke: var(--legging); stroke-width: 10.5; }
+.fig .shin { stroke: var(--legging); stroke-width: 8.5; }
+.fig .thigh.far { stroke: var(--legging-far); }
+.fig .shin.far { stroke: var(--legging-far); }
+.fig .thigh-cap { fill: var(--legging); }
+.fig .uarm { stroke: var(--skin); stroke-width: 6; }
+.fig .farm { stroke: var(--skin); stroke-width: 5.2; }
+.fig .uarm.far, .fig .farm.far { stroke: var(--skin-far); }
+.fig .hand { fill: var(--skin); } .fig .hand.far { fill: var(--skin-far); }
+.fig .skin-cap { fill: var(--skin); }
+.fig .neck { stroke: var(--skin); stroke-width: 4.5; }
+.fig .face { fill: var(--skin); } .fig .hair { fill: var(--hair); }
+.fig .shoe { stroke: var(--shoe); stroke-width: 6; } .fig .shoe.far { stroke: var(--shoe-far); }
+.fig .sole { stroke: var(--sole); stroke-width: 6.5; }
+.fig .roller { fill: var(--roller); } .fig .roller-line { stroke: var(--roller-line); stroke-width: 2; fill: none; }
 .fig .mat { fill: var(--mat); }
 .fig .ring { fill: none; stroke: var(--wt); stroke-width: 3.6; }
 .fig .wt { stroke: var(--wt); stroke-width: 5.5; stroke-linecap: round; }
@@ -231,3 +248,7 @@ textarea { min-height: 90px; font-size: 13px; font-family: ui-monospace, Menlo, 
   .p-fig.anim .fig:nth-child(2) { opacity: 1; }
   .p-prog span { transition: none; }
 }
+
+.p-toggles { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.p-next.soon { color: var(--ink); font-weight: 600; font-size: 17px; }
+.p-next.soon b { color: var(--accent); }

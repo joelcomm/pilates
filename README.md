@@ -1,6 +1,6 @@
 # Mat Daily
 
-Daily mat Pilates workouts with light weights and an optional Pilates ring. Pick a focus (abs, arms, legs and glutes, or full body), a length (15 to 60 minutes) and an intensity, then follow along with pictures and a guided timer. Every session can be logged in the built-in tracker.
+Daily mat Pilates workouts with light weights and an optional Pilates ring and foam roller. The guided workout has generated background music, spoken prompts for the next move, a countdown, and an option to remove the rest between moves. Pick a focus (abs, arms, legs and glutes, or full body), a length (15 to 60 minutes) and an intensity, then follow along with pictures and a guided timer. Every session can be logged in the built-in tracker.
 
 It is a plain HTML, CSS and JS web app with no build step. It works offline and can be added to a phone's home screen. Workout logs are stored in the browser only.
 

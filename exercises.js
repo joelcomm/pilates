@@ -38,6 +38,9 @@
     return {
       hip: p.h, s1: s1, s2: s2,
       head: pt(s2, p.hd === undefined ? t2 : p.hd, NK),
+      hd: p.hd === undefined ? t2 : p.hd,
+      fd: p.fd || 1,
+      roller: p.roller,
       arms: p.a.map(function (s) { return limb(s2, s, UA, FA, 1); }),
       legs: p.l.map(function (s) { return limb(p.h, s, TH, SH, -1); }),
       ring: p.ring
@@ -69,13 +72,68 @@
     return '<ellipse class="ring" cx="' + f1(c[0]) + '" cy="' + f1(c[1]) + '" rx="' + sk.ring.rx + '" ry="' + sk.ring.ry + '"/>';
   }
 
+  // Foam roller: a round roller seen end-on, or a long one lying under the spine.
+  function rollerBox(sk) {
+    var r = sk.roller, rad = r.r || 6;
+    if (r.bar) return { x1: r.bar[0], x2: r.bar[1], cy: 110 - rad, r: rad, bar: true };
+    var cx = r.cx, cy = 110 - rad;
+    if (r.at === 'ankles') {
+      cx = (sk.legs[0][2][0] + sk.legs[1][2][0]) / 2;
+      cy = (sk.legs[0][2][1] + sk.legs[1][2][1]) / 2 + (r.dy || 9.5);
+    }
+    return { x1: cx - rad, x2: cx + rad, cx: cx, cy: cy, r: rad };
+  }
+  function rollerShape(sk) {
+    var b = rollerBox(sk);
+    if (b.bar) {
+      return '<rect class="roller" x="' + f1(b.x1) + '" y="' + f1(b.cy - b.r) + '" width="' + f1(b.x2 - b.x1) + '" height="' + f1(2 * b.r) + '" rx="' + b.r + '"/>' +
+        '<line class="roller-line" x1="' + f1(b.x1 + b.r) + '" y1="' + f1(b.cy) + '" x2="' + f1(b.x2 - b.r) + '" y2="' + f1(b.cy) + '"/>';
+    }
+    return '<circle class="roller" cx="' + f1(b.cx) + '" cy="' + f1(b.cy) + '" r="' + b.r + '"/><circle class="roller-line" cx="' + f1(b.cx) + '" cy="' + f1(b.cy) + '" r="' + f1(b.r * 0.45) + '"/>';
+  }
+
+  var seg = function (a, b, cls) {
+    return '<line class="' + cls + '" x1="' + f1(a[0]) + '" y1="' + f1(a[1]) + '" x2="' + f1(b[0]) + '" y2="' + f1(b[1]) + '"/>';
+  };
+  var ang = function (a, b) { return Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI; };
+
+  // Sneaker: sole and upper, pointing the way the toes face (shin turned 90 degrees).
+  function shoe(knee, ankle, far) {
+    var sa = ang(knee, ankle), fa = sa - 90;
+    var t0 = pt(ankle, fa, -2.5), t1 = pt(ankle, fa, 8.5);
+    var o = pt([0, 0], sa, 2.6);
+    return seg([t0[0] + o[0], t0[1] + o[1]], [t1[0] + o[0], t1[1] + o[1]], 'sole') +
+      seg(t0, t1, far ? 'shoe far' : 'shoe');
+  }
+
+  function limbs(sk, far) {
+    var arm = far ? sk.arms[1] : sk.arms[0], leg = far ? sk.legs[1] : sk.legs[0], f = far ? ' far' : '';
+    return seg(leg[0], leg[1], 'thigh' + f) + seg(leg[1], leg[2], 'shin' + f) + shoe(leg[1], leg[2], far) +
+      seg(arm[0], arm[1], 'uarm' + f) + seg(arm[1], arm[2], 'farm' + f) +
+      '<circle class="hand' + f + '" cx="' + f1(arm[2][0]) + '" cy="' + f1(arm[2][1]) + '" r="3.3"/>';
+  }
+
+  // Head with hair and bun, facing the way the body faces.
+  function headShape(sk) {
+    var nd = [Math.cos(rad(sk.hd)), Math.sin(rad(sk.hd))];
+    var fa = sk.hd + 90 * sk.fd, fv = [Math.cos(rad(fa)), Math.sin(rad(fa))];
+    var h = sk.head, R = HR;
+    var at = function (a, b) { return [h[0] + nd[0] * a + fv[0] * b, h[1] + nd[1] * a + fv[1] * b]; };
+    var hair = at(0.5, -0.4 * R), face = at(-0.6, 0.35 * R), bun = at(0.95 * R, -0.85 * R);
+    var circ = function (c, r, cls) { return '<circle class="' + cls + '" cx="' + f1(c[0]) + '" cy="' + f1(c[1]) + '" r="' + r + '"/>'; };
+    return seg(sk.s2, h, 'neck') + circ(bun, 3.6, 'hair') + circ(hair, R + 0.8, 'hair') + circ(face, R - 0.9, 'face');
+  }
+
   function shapes(sk, withWeights) {
     var out = '';
-    out += poly(sk.arms[1], 'far') + poly(sk.legs[1], 'far');
-    out += poly([sk.hip, sk.s1, sk.s2], 'body torso');
-    out += poly(sk.legs[0], 'body');
-    out += poly(sk.arms[0], 'body');
-    out += '<circle class="head" cx="' + f1(sk.head[0]) + '" cy="' + f1(sk.head[1]) + '" r="' + HR + '"/>';
+    if (sk.roller) out += rollerShape(sk);
+    out += limbs(sk, true);
+    var tstart = [sk.hip[0] + (sk.s1[0] - sk.hip[0]) * 0.3, sk.hip[1] + (sk.s1[1] - sk.hip[1]) * 0.3];
+    out += '<circle class="thigh-cap" cx="' + f1(sk.hip[0]) + '" cy="' + f1(sk.hip[1]) + '" r="6.2"/>';
+    out += poly([tstart, sk.s1, sk.s2], 'tank');
+    out += '<circle class="skin-cap" cx="' + f1(sk.s2[0]) + '" cy="' + f1(sk.s2[1]) + '" r="3.4"/>';
+    out += limbs(sk, false);
+    out += headShape(sk);
     if (withWeights) out += weightsAt(sk.arms[1]) + weightsAt(sk.arms[0]);
     if (sk.ring) out += ringShape(sk);
     return out;
@@ -85,6 +143,7 @@
     var pts = [sk.hip, sk.s1, sk.s2, sk.head];
     sk.arms.concat(sk.legs).forEach(function (l) { pts = pts.concat(l); });
     if (sk.ring) { var rc = ringCenter(sk); pts.push([rc[0] - sk.ring.rx, rc[1] - sk.ring.ry], [rc[0] + sk.ring.rx, rc[1] + sk.ring.ry]); }
+    if (sk.roller) { var rb = rollerBox(sk); pts.push([rb.x1, rb.cy - rb.r], [rb.x2, rb.cy + rb.r]); }
     return pts;
   }
 
@@ -258,8 +317,8 @@
       cues: ['Long neck', 'Reach, do not scrunch', 'Squeeze the glutes'],
       easier: 'Lift only the legs or only the arms.', harder: 'Lift higher and speed up the beats.',
       feel: 'Back, glutes, core',
-      frames: [{ h: [150, 106], t: 180, t2: 195, hd: 200, a: [[195, 195], [175, 175]], l: [[2, 2], [-8, -8]] },
-        { h: [150, 106], t: 180, t2: 195, hd: 200, a: [[175, 175], [195, 195]], l: [[-8, -8], [2, 2]] }]
+      frames: [{ h: [150, 106], t: 180, t2: 195, hd: 200, fd: -1, a: [[195, 195], [175, 175]], l: [[2, 2], [-8, -8]] },
+        { h: [150, 106], t: 180, t2: 195, hd: 200, fd: -1, a: [[175, 175], [195, 195]], l: [[-8, -8], [2, 2]] }]
     },
     {
       id: 'catcow', name: 'Cat-Cow', g: ['abs'], pos: 'quad', lvl: 1, kind: 'reps', tempo: 5, use: ['warm', 'main'], wo: 2,
@@ -486,8 +545,8 @@
       cues: ['Hips heavy', 'Pointed toes', 'Slow lower'],
       easier: 'Keep the movement small.', harder: 'Add a mini-pulse at the top.',
       feel: 'Hamstrings, glutes',
-      frames: [{ h: [150, 106], t: 180, t2: 185, hd: 200, a: [{ to: [96, 100], b: 1 }, { to: [98, 100], b: 1 }], l: [[2, 2], [2, 2]] },
-        { h: [150, 106], t: 180, t2: 185, hd: 200, a: [{ to: [96, 100], b: 1 }, { to: [98, 100], b: 1 }], l: [[2, -110], [2, 2]] }]
+      frames: [{ h: [150, 106], t: 180, t2: 185, hd: 200, fd: -1, a: [{ to: [96, 100], b: 1 }, { to: [98, 100], b: 1 }], l: [[2, 2], [2, 2]] },
+        { h: [150, 106], t: 180, t2: 185, hd: 200, fd: -1, a: [{ to: [96, 100], b: 1 }, { to: [98, 100], b: 1 }], l: [[2, -110], [2, 2]] }]
     },
     {
       id: 'glutekick', name: 'Standing Glute Kickback', g: ['legs'], pos: 'standing', lvl: 1, kind: 'reps', tempo: 3, sides: true, use: ['main'],
@@ -590,6 +649,73 @@
       feel: 'Outer hip, inner thigh, waist',
       frames: [{ h: [150, 105], t: 180, hd: 180, a: [{ to: [142, 98], b: -1 }, [180, 180]], l: [[0, 0], [1, 1]], ring: { at: 'ankles', rx: 3, ry: 8 } },
         { h: [150, 105], t: 180, hd: 180, a: [{ to: [142, 98], b: -1 }, [180, 180]], l: [[-20, -20], [-14, -14]], ring: { at: 'ankles', rx: 3, ry: 8 } }]
+    },
+
+    // ===== FOAM ROLLER =====
+    {
+      id: 'rollerback', name: 'Roller Upper-Back Extension', g: ['abs', 'arms'], pos: 'supine', lvl: 1, kind: 'reps', tempo: 5, roller: true, use: ['warm', 'main', 'cool'], wo: 2.5, co: 2,
+      blurb: 'Lie over the roller and gently arch back to open the chest and loosen the upper back.',
+      steps: ['Sit with the roller behind you, then lie back so it sits under your shoulder blades. Knees bent, feet flat, hands cradling your head.',
+        'Lift your hips a few inches and keep your abs gently drawn in.',
+        'Exhale and let your upper back arch over the roller, then inhale and come back to neutral.',
+        'Roll a little up or down the spine between rounds. Skip your low back and neck.'],
+      cues: ['Support your head with your hands', 'Ribs stay soft', 'Small, slow arches'],
+      easier: 'Keep your hips down and arch less.', harder: 'Lift your hips higher and hold each arch for 3 breaths.',
+      feel: 'Upper back, chest (stretch)',
+      frames: [{ h: [150, 94], t: 182.5, hd: 187, a: [{ to: [107, 82], b: -1 }, { to: [109, 84], b: -1 }], l: [{ to: [192, 106], b: -1 }, { to: [194, 106], b: -1 }], roller: { cx: 118, r: 6 } },
+        { h: [150, 94], t: 182.5, t2: 170, hd: 168, a: [{ to: [107, 90], b: -1 }, { to: [109, 92], b: -1 }], l: [{ to: [192, 106], b: -1 }, { to: [194, 106], b: -1 }], roller: { cx: 128, r: 6 } }]
+    },
+    {
+      id: 'rollerhamcurl', name: 'Roller Hamstring Curl', g: ['legs'], pos: 'supine', lvl: 2, kind: 'reps', tempo: 4, roller: true, use: ['main'],
+      blurb: 'Bridge with your heels on the roller, then roll it toward you. A mat version of the reformer leg curl.',
+      steps: ['Lie on your back with your heels on the roller and legs straight. Lift your hips into a bridge.',
+        'Exhale and bend your knees, rolling the roller toward your hips.',
+        'Inhale and roll it back out, keeping your hips high.',
+        'Squeeze your glutes the whole time.'],
+      cues: ['Hips stay level and high', 'Press down through the heels', 'Slow roll out'],
+      easier: 'Keep your hips lower, or bend your knees to start.', harder: 'Do it with one leg at a time.',
+      feel: 'Hamstrings, glutes, core',
+      frames: [P(BR_UP, { l: [{ to: [193, 94.5], b: -1 }, { to: [195, 94.5], b: -1 }], roller: { at: 'ankles', r: 6 } }),
+        P(BR_UP, { l: [{ to: [166, 94.5], b: -1 }, { to: [168, 94.5], b: -1 }], roller: { at: 'ankles', r: 6 } })]
+    },
+    {
+      id: 'rollerdeadbug', name: 'Roller Dead Bug', g: ['abs'], pos: 'supine', lvl: 2, kind: 'reps', tempo: 4, roller: true, use: ['main'],
+      blurb: 'Lie lengthwise on the roller and lower the opposite arm and leg. The roller makes balance the challenge.',
+      steps: ['Lie with the roller along your spine, head and tailbone supported. Arms up, knees in tabletop.',
+        'Exhale and reach one arm overhead as the opposite leg extends.',
+        'Inhale back to center and switch sides.',
+        'Keep the roller still and your ribs down.'],
+      cues: ['Do not rock side to side', 'Slow and controlled', 'Belly pulled in'],
+      easier: 'Move only the legs and keep both feet close to the floor.', harder: 'Hold each reach for 3 counts.',
+      feel: 'Deep abs, balance',
+      frames: [P(SUP, { h: [150, 92.5], a: [[-90, -90], [-88, -88]], l: [[-90, 0], [-88, 2]], roller: { bar: [92, 160], r: 6 } }),
+        P(SUP, { h: [150, 92.5], a: [[180, 180], [-90, -90]], l: [[-90, 0], [2, 2]], roller: { bar: [92, 160], r: 6 } })]
+    },
+    {
+      id: 'rollersnow', name: 'Roller Snow Angels', g: ['arms'], pos: 'supine', lvl: 1, kind: 'reps', tempo: 5, roller: true, use: ['main', 'warm'], wo: 2.8,
+      blurb: 'Lie along the roller and sweep your arms overhead like a snow angel. It opens the chest and shoulders.',
+      steps: ['Lie with the roller along your spine, knees bent, feet flat. Arms by your sides, palms up.',
+        'Inhale and sweep your arms out and overhead in a wide arc, keeping them low.',
+        'Exhale and sweep them back to your sides.',
+        'Keep your ribs down and your back from arching.'],
+      cues: ['Arms stay close to the floor', 'Reach long through the fingers', 'Slow sweep'],
+      easier: 'Bend your elbows and make a smaller arc.', harder: 'Hold light weights as you sweep.',
+      feel: 'Chest, shoulders, upper back',
+      frames: [P(SUP, { h: [150, 92.5], a: [[-90, -90], [-88, -88]], l: [{ to: [190, 106], b: -1 }, { to: [192, 106], b: -1 }], roller: { bar: [92, 160], r: 6 } }),
+        P(SUP, { h: [150, 92.5], a: [[190, 190], [193, 193]], l: [{ to: [190, 106], b: -1 }, { to: [192, 106], b: -1 }], roller: { bar: [92, 160], r: 6 } })]
+    },
+    {
+      id: 'rollerhams', name: 'Roller Hamstring Roll', g: ['legs'], pos: 'seated', lvl: 1, kind: 'hold', tempo: 5, roller: true, use: ['cool'], co: 3,
+      blurb: 'Sit with the roller under your thighs and roll slowly from hips to knees to ease tight hamstrings.',
+      steps: ['Sit with the roller under your thighs, hands on the floor behind you, and lift your hips.',
+        'Roll slowly from the top of your thighs toward your knees.',
+        'Pause on any tender spot and breathe for a few seconds.',
+        'Roll back up. Stay off the back of the knee.'],
+      cues: ['Slow and steady', 'Breathe out on tender spots', 'Keep your core on'],
+      easier: 'Keep your hips lower and use less pressure.', harder: 'Cross one ankle over the other for more pressure.',
+      feel: 'Hamstrings (release)',
+      frames: [{ h: [110, 92], t: -104, hd: -100, a: [{ to: [98, 104], b: 1 }, { to: [96, 104], b: 1 }], l: [[2, 2], [3, 3]], roller: { cx: 126, r: 6 } },
+        { h: [110, 92], t: -104, hd: -100, a: [{ to: [98, 104], b: 1 }, { to: [96, 104], b: 1 }], l: [[2, 2], [3, 3]], roller: { cx: 152, r: 6 } }]
     },
 
     // ===== FULL BODY / WARM-UP / COOL-DOWN =====
