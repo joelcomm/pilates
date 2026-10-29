@@ -257,3 +257,32 @@ textarea { min-height: 90px; font-size: 13px; font-family: ui-monospace, Menlo, 
 .pl { display: flex; gap: 8px; max-width: 520px; }
 .pl input { flex: 1; }
 .saved { color: var(--accent); font-weight: 600; }
+
+.fig .eye { fill: #2a1d16; } .fig .blush { fill: #E58C7A; opacity: .55; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.photo-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.photo-row img { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); }
+.photo-row label.btn:focus-within, .vh:focus-visible + .btn { outline: 3px solid var(--accent); }
+
+/* ---------- celebration ---------- */
+.cele { position: relative; width: min(260px, 70vw); aspect-ratio: 1 / 1; align-self: center; }
+.cele svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.cele .char { transform-origin: 50% 100%; animation: pop .8s cubic-bezier(.2, 1.5, .4, 1) both; }
+.cele .head-g { transform-origin: 120px 160px; animation: bob 2.4s ease-in-out .9s infinite; }
+.cele .thumb-g { transform-origin: 205px 150px; animation: thumb 1.3s ease-in-out .8s infinite; }
+.cele .blink { transform-origin: 120px 112px; animation: blink 4s infinite; }
+.cele-photo { width: min(220px, 60vw); aspect-ratio: 1 / 1; position: relative; align-self: center; animation: pop .8s cubic-bezier(.2, 1.5, .4, 1) both; }
+.cele-photo img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 6px solid var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.cele-photo .badge { position: absolute; right: -14px; bottom: -8px; width: 84px; height: 84px; background: var(--card); border-radius: 50%; padding: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.cele-photo .badge svg { width: 100%; height: 100%; }
+.confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 2; }
+.confetti i { position: absolute; top: -20px; width: 9px; height: 15px; border-radius: 2px; animation: fall 3.4s linear infinite; }
+@keyframes pop { 0% { transform: scale(.3) translateY(30px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+@keyframes bob { 0%, 100% { transform: rotate(-2deg) translateY(0); } 50% { transform: rotate(2deg) translateY(-3px); } }
+@keyframes thumb { 0%, 100% { transform: rotate(-6deg) scale(1); } 50% { transform: rotate(8deg) scale(1.08); } }
+@keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes fall { to { transform: translate3d(var(--dx, 20px), 112vh, 0) rotate(560deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .cele .char, .cele .head-g, .cele .thumb-g, .cele .blink, .cele-photo { animation: none; }
+  .confetti { display: none; }
+}

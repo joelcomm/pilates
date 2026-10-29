@@ -246,6 +246,7 @@
     $('#chips-weights').innerHTML = chip('No weights', !p.weights, 'data-weights="0"') + chip('Light weights', p.weights, 'data-weights="1"');
     $('#chips-ring').innerHTML = chip('No ring', !p.ring, 'data-ring="0"') + chip('I have a ring', p.ring, 'data-ring="1"');
     $('#chips-roller').innerHTML = chip('No roller', !p.roller, 'data-roller="0"') + chip('I have a roller', p.roller, 'data-roller="1"');
+    renderPhotoRow();
     var pli = $('#pl-input'); if (pli && document.activeElement !== pli) pli.value = p.playlist || '';
     $('#chips-rest').innerHTML = [0, 5, 10, 15, 20, 30].map(function (n) { return chip(n ? n + ' sec' : 'No rest', p.restSec === n, 'data-rest="' + n + '"'); }).join('');
   }
@@ -398,6 +399,75 @@
     e.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     state.log.push(e); save();
     return e;
+  }
+
+  // ---------- celebration ----------
+  var PHOTO_KEY = 'matdaily.photo';
+  function getPhoto() { try { return localStorage.getItem(PHOTO_KEY) || ''; } catch (e) { return ''; } }
+  function setPhoto(url) {
+    try { if (url) localStorage.setItem(PHOTO_KEY, url); else localStorage.removeItem(PHOTO_KEY); return true; } catch (e) { return false; }
+  }
+  function renderPhotoRow() {
+    var p = getPhoto(), prev = $('#photo-prev'), rm = $('#photo-rm'), btn = $('#photo-btn');
+    if (!prev) return;
+    prev.innerHTML = p ? '<img alt="Your finish-screen photo" src="' + p + '">' : '';
+    rm.hidden = !p; btn.textContent = p ? 'Change photo' : 'Choose a photo';
+  }
+  // Square crop biased toward the top (faces sit high in portraits), shrunk to keep storage small.
+  function shrinkPhoto(file, cb) {
+    var r = new FileReader();
+    r.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var s = Math.min(img.width, img.height), sx = (img.width - s) / 2, sy = (img.height - s) * 0.15, out = 480;
+        var cv = document.createElement('canvas'); cv.width = cv.height = out;
+        cv.getContext('2d').drawImage(img, sx, sy, s, s, 0, 0, out, out);
+        cb(cv.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = function () { cb(''); };
+      img.src = r.result;
+    };
+    r.onerror = function () { cb(''); };
+    r.readAsDataURL(file);
+  }
+
+  function thumbSvg() {
+    return '<svg viewBox="0 0 80 80" aria-hidden="true"><g transform="translate(0,2)"><rect x="14" y="36" width="42" height="34" rx="9" fill="#E2A883"/><rect x="28" y="12" width="14" height="32" rx="7" fill="#E2A883"/>' +
+      '<path d="M20 50 H52 M20 58 H52 M22 66 H50" stroke="#C98E69" stroke-width="2.4" stroke-linecap="round" fill="none"/><rect x="10" y="40" width="10" height="26" rx="4" fill="#25282D"/></g></svg>';
+  }
+
+  // Illustrated celebration: big smile, hair in a bun, thumbs up.
+  function celebrationArt() {
+    return '<svg viewBox="0 0 240 260" role="img" aria-label="Smiling with a thumbs up"><g class="char">' +
+      '<circle cx="120" cy="140" r="112" fill="var(--accent-soft)"/>' +
+      '<path d="M26 262 C26 218 58 200 98 194 L142 194 C182 200 214 218 214 262 Z" fill="var(--tank)"/>' +
+      '<line x1="52" y1="222" x2="40" y2="262" stroke="#E2A883" stroke-width="22" stroke-linecap="round"/>' +
+      '<rect x="102" y="160" width="36" height="40" rx="14" fill="#D9997A"/>' +
+      '<path d="M96 194 Q120 214 144 194 Q120 200 96 194Z" fill="#E2A883"/>' +
+      '<path d="M100 200 Q120 224 140 200" stroke="#C9A24D" stroke-width="1.4" fill="none"/><rect x="117" y="214" width="6" height="12" rx="1.5" fill="#C9A24D"/><rect x="113" y="217" width="14" height="5" rx="1.5" fill="#C9A24D"/>' +
+      '<g class="thumb-g"><line x1="190" y1="222" x2="222" y2="196" stroke="#E2A883" stroke-width="22" stroke-linecap="round"/><line x1="222" y1="196" x2="206" y2="156" stroke="#E2A883" stroke-width="22" stroke-linecap="round"/>' +
+      '<rect x="190" y="136" width="34" height="34" rx="12" fill="#E2A883"/><rect x="199" y="104" width="15" height="42" rx="7.5" fill="#E2A883"/>' +
+      '<path d="M192 148 H222 M192 156 H222 M194 164 H220" stroke="#C98E69" stroke-width="2.2" stroke-linecap="round" fill="none"/></g>' +
+      '<g class="head-g"><circle cx="120" cy="36" r="23" fill="#5B3B27"/><path d="M104 28 Q120 14 136 30 M108 44 Q122 34 134 44" stroke="#9A6E48" stroke-width="3.2" fill="none" stroke-linecap="round"/>' +
+      '<ellipse cx="74" cy="120" rx="7" ry="11" fill="#D9997A"/><ellipse cx="166" cy="120" rx="7" ry="11" fill="#D9997A"/>' +
+      '<ellipse cx="120" cy="118" rx="47" ry="55" fill="#E2A883"/>' +
+      '<path d="M70 112 C66 62 98 50 120 50 C146 50 174 62 170 112 C156 90 136 80 118 80 C100 80 84 92 70 112Z" fill="#5B3B27"/>' +
+      '<path d="M86 84 C98 70 118 66 138 72 M100 76 C114 70 130 70 146 78" stroke="#9A6E48" stroke-width="3" fill="none" stroke-linecap="round" opacity=".8"/>' +
+      '<path d="M91 101 Q104 94 115 100 M125 100 Q136 94 149 101" stroke="#4A2F1F" stroke-width="3.6" fill="none" stroke-linecap="round"/>' +
+      '<g class="blink"><ellipse cx="103" cy="115" rx="5.6" ry="7" fill="#2A1D16"/><ellipse cx="137" cy="115" rx="5.6" ry="7" fill="#2A1D16"/><circle cx="105" cy="112.5" r="1.9" fill="#fff"/><circle cx="139" cy="112.5" r="1.9" fill="#fff"/></g>' +
+      '<circle cx="90" cy="136" r="9" fill="#E58C7A" opacity=".45"/><circle cx="150" cy="136" r="9" fill="#E58C7A" opacity=".45"/>' +
+      '<path d="M116 124 Q120 132 126 130" stroke="#C98E69" stroke-width="2.4" fill="none" stroke-linecap="round"/>' +
+      '<path d="M90 140 Q120 192 150 140 Q120 146 90 140Z" fill="#7A2E34"/><ellipse cx="120" cy="160" rx="12" ry="5" fill="#D9626B"/><path d="M93 141 Q120 150 147 141 Q142 152 120 154 Q98 152 93 141Z" fill="#fff"/>' +
+      '<path d="M90 140 Q120 192 150 140" stroke="#A8434A" stroke-width="2" fill="none" stroke-linecap="round"/></g>' +
+      '</g></svg>';
+  }
+
+  function confettiHtml() {
+    var cols = ['#E58A2E', '#3F64E6', '#1A8F77', '#F2C14E', '#E86A8C', '#6672D0'], out = '';
+    for (var i = 0; i < 26; i++) {
+      out += '<i style="left:' + Math.round((i * 37) % 100) + '%;background:' + cols[i % cols.length] + ';animation-delay:' + (((i * 53) % 30) / 10) + 's;animation-duration:' + (2.8 + (i % 5) * 0.4) + 's;--dx:' + (((i * 29) % 80) - 40) + 'px"></i>';
+    }
+    return '<div class="confetti" aria-hidden="true">' + out + '</div>';
   }
 
   // ---------- guided player ----------
@@ -656,7 +726,10 @@
     var p = run.plan.o, mins = Math.round(run.total / 60);
     var entry = addEntry({ date: todayStr(), minutes: mins, focus: p.focus.slice(), level: p.level, feel: null, note: '', src: 'guided' });
     run.entryId = entry.id;
-    $('#player').innerHTML = '<div class="p-done"><p class="eyebrow">Workout complete</p><h1>Nice work.</h1>' +
+    var photo = getPhoto();
+    $('#player').innerHTML = confettiHtml() + '<div class="p-done">' +
+      (photo ? '<div class="cele-photo"><img alt="" src="' + photo + '"><div class="badge">' + thumbSvg() + '</div></div>' : '<div class="cele">' + celebrationArt() + '</div>') +
+      '<p class="eyebrow">Workout complete</p><h1>Nice work.</h1>' +
       '<p class="blurb">' + esc(focusLabel(p.focus)) + ' · ' + mins + ' min · ' + LEVELS[p.level].label + '</p>' +
       '<p class="saved">Saved to your tracker.</p>' +
       '<p class="blurb">How did it feel?</p>' +
@@ -728,6 +801,7 @@
     else if (act === 'quicklog') { logPlan(null, 'quick'); toast('Logged ' + Math.round(currentPlan.total / 60) + ' min to your tracker'); }
     else if (act === 'p-end') { if (run && !run.done && el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Tap again to end'; setTimeout(function () { el.dataset.sure = ''; el.textContent = 'End'; }, 3000); } else closePlayer(); }
     else if (act === 'p-close') { closePlayer(); toast('Saved to your tracker'); location.hash = '#tracker'; if (!$('#view-tracker').hidden) renderTracker(); }
+    else if (act === 'photo-remove') { setPhoto(''); renderPhotoRow(); toast('Photo removed'); }
     else if (act === 'p-unlog') { var id = run && run.entryId; state.log = state.log.filter(function (e) { return e.id !== id; }); save(); closePlayer(); toast('Removed from your tracker'); }
     else if (act === 'save-playlist') {
       var raw = ($('#pl-input').value || '').trim(), url = parsePlaylist(raw);
@@ -764,6 +838,15 @@
         save(); renderTracker(); toast(n + ' sessions restored');
       } catch (e) { toast('That backup could not be read'); }
     }
+  });
+
+  document.addEventListener('change', function (ev) {
+    if (ev.target.id !== 'photo-input' || !ev.target.files || !ev.target.files[0]) return;
+    shrinkPhoto(ev.target.files[0], function (url) {
+      if (!url || !setPhoto(url)) { toast('Could not use that photo. Try another one.'); return; }
+      renderPhotoRow(); toast('Photo saved on this device');
+    });
+    ev.target.value = '';
   });
 
   document.addEventListener('submit', function (ev) {

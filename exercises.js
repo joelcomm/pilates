@@ -121,7 +121,9 @@
     var at = function (a, b) { return [h[0] + nd[0] * a + fv[0] * b, h[1] + nd[1] * a + fv[1] * b]; };
     var hair = at(0.5, -0.4 * R), face = at(-0.6, 0.35 * R), bun = at(0.95 * R, -0.85 * R);
     var circ = function (c, r, cls) { return '<circle class="' + cls + '" cx="' + f1(c[0]) + '" cy="' + f1(c[1]) + '" r="' + r + '"/>'; };
-    return seg(sk.s2, h, 'neck') + circ(bun, 3.6, 'hair') + circ(hair, R + 0.8, 'hair') + circ(face, R - 0.9, 'face');
+    var eye = at(-0.9, 0.62 * R), cheek = at(-2.6, 0.5 * R);
+    return seg(sk.s2, h, 'neck') + circ(bun, 3.6, 'hair') + circ(hair, R + 0.8, 'hair') + circ(face, R - 0.9, 'face') +
+      circ(eye, 0.95, 'eye') + circ(cheek, 1.5, 'blush');
   }
 
   function shapes(sk, withWeights) {

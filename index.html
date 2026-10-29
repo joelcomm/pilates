@@ -70,6 +70,11 @@
         <label class="label" for="pl-input">Spotify playlist</label>
         <div class="pl"><input type="url" id="pl-input" placeholder="Paste a Spotify playlist link" autocomplete="off" autocapitalize="off"><button type="button" class="btn sm" data-act="save-playlist">Save</button></div>
       </div>
+      <div class="field wide">
+        <span class="label">Finish-screen photo</span>
+        <div class="photo-row"><span id="photo-prev"></span><input type="file" id="photo-input" accept="image/*" class="vh"><label class="btn ghost sm" for="photo-input" id="photo-btn">Choose a photo</label><button type="button" class="btn ghost sm" data-act="photo-remove" id="photo-rm" hidden>Remove</button></div>
+        <p class="muted">Shown when you finish a workout. It stays on this device and is never uploaded.</p>
+      </div>
       <div class="field">
         <span class="label" id="lbl-rest">Rest between moves</span>
         <div class="chips" role="group" aria-labelledby="lbl-rest" id="chips-rest"></div>
