@@ -230,6 +230,12 @@
   function chip(label, pressed, attrs, extra) {
     return '<button type="button" class="chip" aria-pressed="' + (pressed ? 'true' : 'false') + '" ' + attrs + '>' + (extra || '') + esc(label) + '</button>';
   }
+  function parsePlaylist(s) {
+    if (!s) return '';
+    var m = s.match(/^spotify:(playlist|album|artist|show):([A-Za-z0-9]+)$/);
+    if (m) return 'https://open.spotify.com/' + m[1] + '/' + m[2];
+    return /^https:\/\/open\.spotify\.com\/(playlist|album|artist|show)\/[A-Za-z0-9]+/.test(s) ? s : '';
+  }
   function renderBuilder() {
     var p = prefs();
     $('#chips-focus').innerHTML = FOCUS.map(function (f) {
@@ -240,6 +246,7 @@
     $('#chips-weights').innerHTML = chip('No weights', !p.weights, 'data-weights="0"') + chip('Light weights', p.weights, 'data-weights="1"');
     $('#chips-ring').innerHTML = chip('No ring', !p.ring, 'data-ring="0"') + chip('I have a ring', p.ring, 'data-ring="1"');
     $('#chips-roller').innerHTML = chip('No roller', !p.roller, 'data-roller="0"') + chip('I have a roller', p.roller, 'data-roller="1"');
+    var pli = $('#pl-input'); if (pli && document.activeElement !== pli) pli.value = p.playlist || '';
     $('#chips-rest').innerHTML = [0, 5, 10, 15, 20, 30].map(function (n) { return chip(n ? n + ' sec' : 'No rest', p.restSec === n, 'data-rest="' + n + '"'); }).join('');
   }
 
@@ -267,7 +274,9 @@
       '<span>About <b>' + minsLabel(plan.total) + '</b></span></div></div>' +
       '<div class="plan-actions"><button type="button" class="btn" data-act="start">Start guided workout</button>' +
       '<button type="button" class="btn ghost" data-act="shuffle">Shuffle moves</button>' +
-      '<button type="button" class="btn ghost" data-act="quicklog">I did this one</button></div></div>' +
+      '<button type="button" class="btn ghost" data-act="quicklog">I did this one</button>' +
+      (p.playlist ? '<a class="btn ghost" href="' + esc(p.playlist) + '" target="_blank" rel="noopener">Open Spotify</a>' : '') + '</div></div>' +
+      (p.playlist ? '<p class="muted">Tip: start your playlist in Spotify first, then come back here and tap Start. Keep the app Music button off in the workout.</p>' : '') +
       '<div class="sec"><div class="sec-head"><h3>Warm-up</h3><span>' + minsLabel(plan.warmSec) + '</span></div><div class="cards">' + warmHtml + '</div></div>' +
       '<div class="sec"><div class="sec-head"><h3>Main set</h3><span>' + minsLabel(plan.main.length * (L.work + plan.restS) * rounds) + '</span></div>' +
       (rounds > 1 ? '<p class="round-banner">Do these ' + plan.main.length + ' moves in order, then repeat the whole set ' + (rounds - 1) + (rounds === 2 ? ' more time' : ' more times') + '. Second and third rounds: reach a little further or add the harder option.</p>' : '') +
@@ -388,6 +397,7 @@
   function addEntry(e) {
     e.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     state.log.push(e); save();
+    return e;
   }
 
   // ---------- guided player ----------
@@ -644,10 +654,14 @@
     beep(660, 0.15); setTimeout(function () { beep(880, 0.3); }, 180);
     say('Workout complete. Nice work.');
     var p = run.plan.o, mins = Math.round(run.total / 60);
+    var entry = addEntry({ date: todayStr(), minutes: mins, focus: p.focus.slice(), level: p.level, feel: null, note: '', src: 'guided' });
+    run.entryId = entry.id;
     $('#player').innerHTML = '<div class="p-done"><p class="eyebrow">Workout complete</p><h1>Nice work.</h1>' +
-      '<p class="blurb">' + esc(focusLabel(p.focus)) + ' · ' + mins + ' min · ' + LEVELS[p.level].label + '. How did it feel?</p>' +
+      '<p class="blurb">' + esc(focusLabel(p.focus)) + ' · ' + mins + ' min · ' + LEVELS[p.level].label + '</p>' +
+      '<p class="saved">Saved to your tracker.</p>' +
+      '<p class="blurb">How did it feel?</p>' +
       '<div class="feel"><button type="button" class="btn ghost" data-feel="easy">Too easy</button><button type="button" class="btn ghost" data-feel="right">Just right</button><button type="button" class="btn ghost" data-feel="hard">Too hard</button></div>' +
-      '<button type="button" class="btn ghost sm" data-act="p-close">Close without saving</button></div>';
+      '<div class="feel"><button type="button" class="btn" data-act="p-close">Done</button><button type="button" class="btn ghost sm" data-act="p-unlog">Remove from tracker</button></div></div>';
   }
 
   function closePlayer() {
@@ -703,7 +717,9 @@
       renderTracker(); return;
     }
     if (el.dataset.feel) {
-      logPlan(el.dataset.feel, 'guided'); closePlayer(); toast('Saved to your tracker'); location.hash = '#tracker'; if (!$('#view-tracker').hidden) renderTracker(); return;
+      var en = run && run.entryId ? state.log.filter(function (e) { return e.id === run.entryId; })[0] : null;
+      if (en) { en.feel = el.dataset.feel; save(); } else if (currentPlan) logPlan(el.dataset.feel, 'guided');
+      closePlayer(); toast('Saved to your tracker'); location.hash = '#tracker'; if (!$('#view-tracker').hidden) renderTracker(); return;
     }
     var act = el.dataset.act; if (!act) return;
     if (act === 'use-suggest') { p.focus = suggest().focus; save(); renderSuggest(); renderBuilder(); renderPlan(); }
@@ -711,7 +727,14 @@
     else if (act === 'start') startRun();
     else if (act === 'quicklog') { logPlan(null, 'quick'); toast('Logged ' + Math.round(currentPlan.total / 60) + ' min to your tracker'); }
     else if (act === 'p-end') { if (run && !run.done && el.dataset.sure !== '1') { el.dataset.sure = '1'; el.textContent = 'Tap again to end'; setTimeout(function () { el.dataset.sure = ''; el.textContent = 'End'; }, 3000); } else closePlayer(); }
-    else if (act === 'p-close') closePlayer();
+    else if (act === 'p-close') { closePlayer(); toast('Saved to your tracker'); location.hash = '#tracker'; if (!$('#view-tracker').hidden) renderTracker(); }
+    else if (act === 'p-unlog') { var id = run && run.entryId; state.log = state.log.filter(function (e) { return e.id !== id; }); save(); closePlayer(); toast('Removed from your tracker'); }
+    else if (act === 'save-playlist') {
+      var raw = ($('#pl-input').value || '').trim(), url = parsePlaylist(raw);
+      if (raw && !url) { toast('That does not look like a Spotify link'); return; }
+      p.playlist = url; if (url) p.music = false; save(); renderBuilder(); renderPlan();
+      toast(url ? 'Playlist saved. App music is off so Spotify plays.' : 'Playlist removed');
+    }
     else if (act === 'p-pause') { run.paused = !run.paused; run.last = Date.now(); $('#p-pause').textContent = run.paused ? 'Resume' : 'Pause'; musicApply(); try { if (run.paused && 'speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
     else if (act === 'p-skip') gotoStep(run.i + 1);
     else if (act === 'p-prev') gotoStep(run.left < run.steps[run.i].dur - 2 ? run.i : Math.max(0, run.i - 1));

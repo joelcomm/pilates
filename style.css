@@ -252,3 +252,8 @@ textarea { min-height: 90px; font-size: 13px; font-family: ui-monospace, Menlo, 
 .p-toggles { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .p-next.soon { color: var(--ink); font-weight: 600; font-size: 17px; }
 .p-next.soon b { color: var(--accent); }
+
+.field.wide { grid-column: 1 / -1; }
+.pl { display: flex; gap: 8px; max-width: 520px; }
+.pl input { flex: 1; }
+.saved { color: var(--accent); font-weight: 600; }
