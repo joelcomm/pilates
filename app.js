@@ -119,7 +119,7 @@
     if (p.weights === undefined) p.weights = true;
     if (p.ring === undefined) p.ring = false;
     if (p.roller === undefined) p.roller = false;
-    if (p.rest === undefined) p.rest = true;
+    if (p.restSec === undefined) p.restSec = p.rest === false ? 0 : 10;
     if (p.voice === undefined) p.voice = true;
     if (p.music === undefined) p.music = true;
     if (p.beeps === undefined) p.beeps = true;
@@ -128,7 +128,7 @@
 
   function build(o) {
     var L = LEVELS[o.level];
-    var r = rng(hash([o.focus.slice().sort().join(), o.minutes, o.level, o.weights ? 1 : 0, o.ring ? 1 : 0, o.roller ? 1 : 0, o.rest ? 1 : 0, todayStr(), state.shuffle || 0].join('|')));
+    var r = rng(hash([o.focus.slice().sort().join(), o.minutes, o.level, o.weights ? 1 : 0, o.ring ? 1 : 0, o.roller ? 1 : 0, o.restSec, todayStr(), state.shuffle || 0].join('|')));
     var maxLvl = o.level === 0 ? 2 : 3;
     var groups = o.focus.indexOf('full') >= 0 ? ['abs', 'arms', 'legs'] : o.focus.slice();
     var warmN = o.minutes >= 45 ? 4 : o.minutes >= 25 ? 3 : 2;
@@ -136,7 +136,7 @@
     var used = {};
     var gear = function (e) { return (!e.ring || o.ring) && (!e.roller || o.roller); };
     var gearFirst = function (l) { return (o.ring || o.roller) ? l.sort(function (x, y) { return ((y.ring || y.roller) ? 1 : 0) - ((x.ring || x.roller) ? 1 : 0); }) : l; };
-    var restS = o.rest ? L.rest : 0;
+    var restS = o.restSec;
 
     var coolPool = EX.filter(function (e) { return e.use.indexOf('cool') >= 0 && gear(e); });
     var cool = [BY('child')];
@@ -149,7 +149,7 @@
     warm.forEach(function (e) { used[e.id] = 1; });
     warm.sort(function (a, b) { return (a.wo === undefined ? 9 : a.wo) - (b.wo === undefined ? 9 : b.wo); });
 
-    var wr = o.rest ? 5 : 0;
+    var wr = Math.min(restS, 5);
     var warmSec = warm.length * (40 + wr), coolSec = cool.length * (45 + wr);
     var mainSec = Math.max(o.minutes * 60 - warmSec - coolSec, 240);
     var slot = L.work + restS;
@@ -240,7 +240,7 @@
     $('#chips-weights').innerHTML = chip('No weights', !p.weights, 'data-weights="0"') + chip('Light weights', p.weights, 'data-weights="1"');
     $('#chips-ring').innerHTML = chip('No ring', !p.ring, 'data-ring="0"') + chip('I have a ring', p.ring, 'data-ring="1"');
     $('#chips-roller').innerHTML = chip('No roller', !p.roller, 'data-roller="0"') + chip('I have a roller', p.roller, 'data-roller="1"');
-    $('#chips-rest').innerHTML = chip('Short rest', p.rest, 'data-rest="1"') + chip('No rest', !p.rest, 'data-rest="0"');
+    $('#chips-rest').innerHTML = [0, 5, 10, 15, 20, 30].map(function (n) { return chip(n ? n + ' sec' : 'No rest', p.restSec === n, 'data-rest="' + n + '"'); }).join('');
   }
 
   function renderSuggest() {
@@ -269,7 +269,7 @@
       '<button type="button" class="btn ghost" data-act="shuffle">Shuffle moves</button>' +
       '<button type="button" class="btn ghost" data-act="quicklog">I did this one</button></div></div>' +
       '<div class="sec"><div class="sec-head"><h3>Warm-up</h3><span>' + minsLabel(plan.warmSec) + '</span></div><div class="cards">' + warmHtml + '</div></div>' +
-      '<div class="sec"><div class="sec-head"><h3>Main set</h3><span>' + minsLabel(plan.main.length * (L.work + L.rest) * rounds) + '</span></div>' +
+      '<div class="sec"><div class="sec-head"><h3>Main set</h3><span>' + minsLabel(plan.main.length * (L.work + plan.restS) * rounds) + '</span></div>' +
       (rounds > 1 ? '<p class="round-banner">Do these ' + plan.main.length + ' moves in order, then repeat the whole set ' + (rounds - 1) + (rounds === 2 ? ' more time' : ' more times') + '. Second and third rounds: reach a little further or add the harder option.</p>' : '') +
       '<div class="cards">' + mainHtml + '</div></div>' +
       '<div class="sec"><div class="sec-head"><h3>Cool-down</h3><span>' + minsLabel(plan.coolSec) + '</span></div><div class="cards">' + coolHtml + '</div></div>';
@@ -513,7 +513,7 @@
       } else steps.push(Object.assign({}, base, { kind: 'work', dur: work, work: work }));
       if (rest > 0) steps.push(Object.assign({}, base, { kind: 'rest', dur: rest }));
     }
-    var wr = p.rest ? 5 : 0;
+    var wr = Math.min(plan.restS, 5);
     plan.warm.forEach(function (e) { add(e, 40, wr, 'Warm-up'); });
     for (var r = 1; r <= plan.rounds; r++) plan.main.forEach(function (e) { add(e, plan.L.work, plan.restS, 'Round ' + r + ' of ' + plan.rounds, r); });
     plan.cool.forEach(function (e, i) { add(e, 45, i === plan.cool.length - 1 ? 0 : wr, 'Cool-down'); });
@@ -678,7 +678,7 @@
     if (el.dataset.time) { p.minutes = +el.dataset.time; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.level) { p.level = +el.dataset.level; save(); renderSuggest(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.roller) { p.roller = el.dataset.roller === '1'; save(); renderBuilder(); renderPlan(); return; }
-    if (el.dataset.rest) { p.rest = el.dataset.rest === '1'; save(); renderBuilder(); renderPlan(); return; }
+    if (el.dataset.rest) { p.restSec = +el.dataset.rest; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.ring) { p.ring = el.dataset.ring === '1'; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.weights) { p.weights = el.dataset.weights === '1'; save(); renderBuilder(); renderPlan(); return; }
     if (el.dataset.lib) { libFilter = el.dataset.lib; renderLibrary(); return; }
