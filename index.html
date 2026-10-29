@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mat Daily</title>
+<meta name="description" content="Daily mat Pilates workouts with light weights. Pick your focus, time and intensity, follow along, and track every session.">
+<meta name="theme-color" content="#1A6B5B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mat Daily">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!--BODY-->
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#today" aria-label="Mat Daily home">
+      <svg class="brand-mark" viewBox="0 0 32 20" aria-hidden="true"><rect x="1" y="14" width="30" height="5" rx="2.5" class="bm-mat"/><path d="M5 12 C10 2, 18 2, 23 8 L28 12" class="bm-line"/><circle cx="25" cy="5" r="3" class="bm-head"/></svg>
+      <span>Mat Daily</span>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#today" data-tab="today">Today</a>
+      <a href="#library" data-tab="library">Moves</a>
+      <a href="#tracker" data-tab="tracker">Tracker</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="view-today" class="view" aria-label="Today's workout">
+    <div class="today-head">
+      <p class="eyebrow" id="today-date"></p>
+      <h1>What are we doing today?</h1>
+    </div>
+
+    <div class="suggest" id="suggest"></div>
+
+    <div class="builder" id="builder">
+      <div class="field">
+        <span class="label" id="lbl-focus">Focus</span>
+        <div class="chips" role="group" aria-labelledby="lbl-focus" id="chips-focus"></div>
+      </div>
+      <div class="field">
+        <span class="label" id="lbl-time">Time</span>
+        <div class="chips" role="group" aria-labelledby="lbl-time" id="chips-time"></div>
+      </div>
+      <div class="field">
+        <span class="label" id="lbl-level">Intensity</span>
+        <div class="chips" role="group" aria-labelledby="lbl-level" id="chips-level"></div>
+      </div>
+      <div class="field">
+        <span class="label" id="lbl-weights">Weights</span>
+        <div class="chips" role="group" aria-labelledby="lbl-weights" id="chips-weights"></div>
+      </div>
+    </div>
+
+    <div id="plan"></div>
+  </section>
+
+  <section id="view-library" class="view" aria-label="Move library" hidden>
+    <div class="today-head">
+      <p class="eyebrow">Every move, with pictures</p>
+      <h1>Moves</h1>
+    </div>
+    <div class="chips filters" id="lib-filters" role="group" aria-label="Filter moves"></div>
+    <div class="cards" id="lib-cards"></div>
+  </section>
+
+  <section id="view-tracker" class="view" aria-label="Workout tracker" hidden>
+    <div class="today-head">
+      <p class="eyebrow">Your sessions</p>
+      <h1>Tracker</h1>
+    </div>
+    <div id="tracker"></div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<div class="player" id="player" role="dialog" aria-modal="true" aria-label="Guided workout" hidden></div>
+
+<script src="exercises.js"></script>
+<script src="app.js"></script>
+<script>if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) navigator.serviceWorker.register("sw.js").catch(function () {});</script>
+<!--/BODY-->
+</body>
+</html>

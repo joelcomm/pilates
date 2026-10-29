@@ -1,0 +1,15 @@
+{
+  "name": "Mat Daily",
+  "short_name": "Mat Daily",
+  "description": "Daily mat Pilates workouts with light weights, plus a workout tracker.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EDF1EE",
+  "theme_color": "#1A6B5B",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
